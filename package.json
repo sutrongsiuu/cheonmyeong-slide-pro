@@ -1,0 +1,85 @@
+{
+  "name": "cheonmyeongslidepro",
+  "version": "1.5.0",
+  "description": "예배 슬라이드 프레젠테이션 앱",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build-win": "electron-builder --win --x64",
+    "build-win-arm64": "electron-builder --win --arm64",
+    "build-mac": "electron-builder --mac"
+  },
+  "build": {
+    "appId": "com.worshipslide.pro",
+    "productName": "CheonMyeongSlidePro",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "pptxExport.js",
+      "preload.js",
+      "index.html",
+      "screen.html",
+      "package.json",
+      "icon.ico",
+      "icon.icns",
+      "icon.png",
+      "node_modules/**/*",
+      "!**/*.backup-*",
+      "!**/*.bak",
+      "!**/*.md",
+      "!.DS_Store",
+      "!.claude/**",
+      "!.gitignore",
+      "!*.code-workspace",
+      "!dist/**"
+    ],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] }
+      ],
+      "icon": "icon.ico"
+    },
+    "portable": {
+      "artifactName": "천명프로그램-${version}-portable.exe"
+    },
+    "mac": {
+      "target": [{ "target": "dmg", "arch": ["x64", "arm64"] }],
+      "icon": "icon.icns",
+      "artifactName": "천명프로그램-${version}-${arch}-mac.dmg"
+    },
+    "dmg": {
+      "title": "Cheon Myeong Slide Pro"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerLanguages": [
+        "ko_KR"
+      ],
+      "artifactName": "천명프로그램-${version}-설치파일.exe",
+      "installerIcon": "icon.ico",
+      "uninstallerIcon": "icon.ico",
+      "shortcutName": "천명 프로그램",
+      "uninstallDisplayName": "천명 프로그램",
+      "menuCategory": "천명 프로그램"
+    }
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "keywords": [
+    "worship",
+    "slide",
+    "presentation"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@google/genai": "^1.50.1",
+    "@xmldom/xmldom": "^0.9.10",
+    "adm-zip": "^0.5.16"
+  }
+}

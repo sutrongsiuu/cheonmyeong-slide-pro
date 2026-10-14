@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.claude/
+._*
+.DS_Store
+*.backup-*
+*.bak
+Users*
