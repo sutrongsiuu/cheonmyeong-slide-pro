@@ -1582,6 +1582,48 @@ function setupAutoUpdater() {
   });
 }
 
+/**
+ * 버전이 바뀐 뒤 처음 실행될 때, 새 코드가 데이터를 읽기 전에 사용자 데이터를 백업한다.
+ * 업데이트 자체는 userData 폴더를 건드리지 않지만, 새 버전 코드가 기존 데이터를
+ * 잘못 다룰 경우를 대비한 보험이다. (창을 만들기 전에 호출해야 localStorage 파일이 잠기지 않음)
+ *
+ * 백업 위치: userData/backups/<이전버전>_to_<새버전>_<시각>/  (최근 5개만 보관)
+ */
+function backupUserDataOnVersionChange() {
+  try {
+    const userData    = app.getPath("userData");
+    const versionFile = path.join(userData, "last-run-version.txt");
+    const current     = app.getVersion();
+    // 기록 파일이 없는데 기존 데이터가 있으면 = 이 백업 기능이 없던 버전(1.5.1 이하)에서 업데이트된 경우
+    const hasData     = ["settings.json", "Local Storage"].some(n => fs.existsSync(path.join(userData, n)));
+    const previous    = fs.existsSync(versionFile) ? fs.readFileSync(versionFile, "utf8").trim()
+                      : (hasData ? "old" : "");
+
+    if (previous && previous !== current) {
+      const stamp     = new Date().toISOString().replace(/[:.]/g, "-");
+      const backupDir = path.join(userData, "backups", `${previous}_to_${current}_${stamp}`);
+      fs.mkdirSync(backupDir, { recursive: true });
+
+      // 설정 + 프로젝트/레이아웃 등 localStorage 데이터
+      for (const name of ["settings.json", "Local Storage"]) {
+        const src = path.join(userData, name);
+        if (fs.existsSync(src)) fs.cpSync(src, path.join(backupDir, name), { recursive: true });
+      }
+
+      // 오래된 백업 정리 (최근 5개 유지)
+      const root = path.join(userData, "backups");
+      const all  = fs.readdirSync(root).map(n => ({ n, t: fs.statSync(path.join(root, n)).mtimeMs }))
+                     .sort((a, b) => b.t - a.t);
+      for (const old of all.slice(5)) fs.rmSync(path.join(root, old.n), { recursive: true, force: true });
+    }
+
+    // 첫 설치(previous 없음)이거나 버전이 바뀌었으면 기록 갱신
+    if (previous !== current) fs.writeFileSync(versionFile, current, "utf8");
+  } catch (e) {
+    console.warn("업데이트 전 데이터 백업 실패:", e.message);  // 백업 실패해도 앱 실행은 계속
+  }
+}
+
 /** 새 버전을 확인한다. manual=true면 결과를 대화상자로 알려준다. */
 function checkForUpdates(manual = false) {
   if (!app.isPackaged) {
@@ -1603,6 +1645,7 @@ app.commandLine.appendSwitch('disable-features', 'PreloadMediaEngagementData,Med
 
 /** Electron이 초기화를 완료하면 메뉴와 메인 창을 생성한다. */
 app.whenReady().then(() => {
+  backupUserDataOnVersionChange();  // 반드시 창 생성 전에 (새 코드가 데이터를 읽기 전)
   buildMenu();
   createMainWindow();
   setupAutoUpdater();
