@@ -22,6 +22,17 @@ npm start          # 실행
 npm run build-win  # Windows 설치파일 빌드 (dist/ 폴더에 생성)
 ```
 
+### 새 버전 배포 (자동 업데이트)
+
+1. `package.json`의 `version`을 올립니다. (예: 1.5.1 → 1.6.0)
+2. 아래 명령으로 빌드와 동시에 GitHub Releases에 업로드합니다.
+   ```powershell
+   $env:GH_TOKEN = gh auth token
+   npm run release
+   ```
+3. 이미 설치한 사용자는 프로그램을 켤 때 새 버전을 자동으로 내려받고, 재시작하거나 종료할 때 업데이트됩니다.
+   (메뉴 **Cheon Myeong Slide Pro → 업데이트 확인**으로 직접 확인할 수도 있습니다.)
+
 ## 라이선스
 
 MIT

@@ -1,17 +1,21 @@
 {
   "name": "cheonmyeongslidepro",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "예배 슬라이드 프레젠테이션 앱",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "build-win": "electron-builder --win --x64",
     "build-win-arm64": "electron-builder --win --arm64",
-    "build-mac": "electron-builder --mac"
+    "build-mac": "electron-builder --mac",
+    "release": "electron-builder --win --x64 --publish always"
   },
   "build": {
     "appId": "com.worshipslide.pro",
     "productName": "CheonMyeongSlidePro",
+    "publish": [
+      { "provider": "github", "owner": "sutrongsiuu", "repo": "cheonmyeong-slide-pro", "releaseType": "release" }
+    ],
     "directories": {
       "output": "dist"
     },
@@ -37,17 +41,30 @@
     ],
     "win": {
       "target": [
-        { "target": "nsis", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "icon.ico"
     },
     "portable": {
-      "artifactName": "천명프로그램-${version}-portable.exe"
+      "artifactName": "CheonMyeong-${version}-portable.exe"
     },
     "mac": {
-      "target": [{ "target": "dmg", "arch": ["x64", "arm64"] }],
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
       "icon": "icon.icns",
-      "artifactName": "천명프로그램-${version}-${arch}-mac.dmg"
+      "artifactName": "CheonMyeong-${version}-${arch}-mac.dmg"
     },
     "dmg": {
       "title": "Cheon Myeong Slide Pro"
@@ -58,7 +75,7 @@
       "installerLanguages": [
         "ko_KR"
       ],
-      "artifactName": "천명프로그램-${version}-설치파일.exe",
+      "artifactName": "CheonMyeong-${version}-Setup.exe",
       "installerIcon": "icon.ico",
       "uninstallerIcon": "icon.ico",
       "shortcutName": "천명 프로그램",
@@ -80,6 +97,7 @@
   "dependencies": {
     "@google/genai": "^1.50.1",
     "@xmldom/xmldom": "^0.9.10",
-    "adm-zip": "^0.5.16"
+    "adm-zip": "^0.5.16",
+    "electron-updater": "^6.8.9"
   }
 }

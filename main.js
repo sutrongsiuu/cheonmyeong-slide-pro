@@ -34,6 +34,10 @@ try { AdmZip = require("adm-zip"); } catch(e) { console.warn("adm-zip 미설치:
 let buildPptxBuffer = null;
 try { ({ buildPptxBuffer } = require("./pptxExport")); } catch(e) { console.warn("pptxExport 모듈 로드 실패:", e.message); }
 
+// 자동 업데이트 (GitHub Releases에서 새 버전 확인) — 없어도 앱 실행 가능
+let autoUpdater = null;
+try { ({ autoUpdater } = require("electron-updater")); } catch(e) { console.warn("electron-updater 미설치:", e.message); }
+
 // ── 전역 창 참조 ──
 let mainWin   = null;  // 메인 조작창 (index.html)
 let secondWin = null;  // 외부 송출 화면 (screen.html)
@@ -1490,6 +1494,7 @@ function buildMenu() {
       label: "Cheon Myeong Slide Pro",
       submenu: [
         { label: "버전 정보", role: "about" },
+        { label: "업데이트 확인", click: () => checkForUpdates(true) },
         { type: "separator" },
         { label: "종료", role: "quit" }
       ]
@@ -1521,6 +1526,74 @@ function buildMenu() {
   Menu.setApplicationMenu(menu);
 }
 
+// ──────────────────────────────────────────────────────────
+// 자동 업데이트
+// ──────────────────────────────────────────────────────────
+
+let updateManualCheck = false;  // 메뉴에서 직접 확인한 경우에만 "최신 버전" 안내를 띄움
+
+/**
+ * 이벤트 핸들러를 등록한다. 새 버전은 백그라운드에서 내려받고,
+ * 다 받으면 재시작 여부를 묻는다. (예배 중 갑자기 꺼지지 않도록 자동 재시작은 하지 않음)
+ * "나중에"를 고르면 앱을 종료할 때 설치된다.
+ */
+function setupAutoUpdater() {
+  if (!autoUpdater) return;
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on("update-not-available", () => {
+    if (!updateManualCheck) return;
+    updateManualCheck = false;
+    dialog.showMessageBox(mainWin, {
+      type: "info", title: "업데이트 확인",
+      message: `최신 버전을 사용 중입니다. (v${app.getVersion()})`
+    });
+  });
+
+  autoUpdater.on("update-available", (info) => {
+    if (!updateManualCheck) return;
+    updateManualCheck = false;
+    dialog.showMessageBox(mainWin, {
+      type: "info", title: "업데이트 확인",
+      message: `새 버전 v${info.version}을 내려받는 중입니다.\n완료되면 알려드릴게요.`
+    });
+  });
+
+  autoUpdater.on("update-downloaded", async (info) => {
+    const { response } = await dialog.showMessageBox(mainWin, {
+      type: "info", title: "업데이트 준비 완료",
+      message: `새 버전 v${info.version}이 준비되었습니다.`,
+      detail: "지금 재시작하여 업데이트할까요?\n'나중에'를 누르면 프로그램을 종료할 때 자동으로 설치됩니다.",
+      buttons: ["지금 재시작", "나중에"], defaultId: 0, cancelId: 1
+    });
+    if (response === 0) autoUpdater.quitAndInstall();
+  });
+
+  autoUpdater.on("error", (err) => {
+    console.warn("업데이트 확인 실패:", err && err.message);
+    if (!updateManualCheck) return;  // 자동 확인 실패(오프라인 등)는 조용히 넘어감
+    updateManualCheck = false;
+    dialog.showMessageBox(mainWin, {
+      type: "warning", title: "업데이트 확인",
+      message: "업데이트를 확인하지 못했습니다.",
+      detail: "인터넷 연결을 확인한 뒤 다시 시도해 주세요."
+    });
+  });
+}
+
+/** 새 버전을 확인한다. manual=true면 결과를 대화상자로 알려준다. */
+function checkForUpdates(manual = false) {
+  if (!app.isPackaged) {
+    // npm start 개발 실행에서는 업데이트를 확인하지 않음
+    if (manual) dialog.showMessageBox(mainWin, { type: "info", title: "업데이트 확인", message: "개발 모드에서는 업데이트를 확인하지 않습니다." });
+    return;
+  }
+  if (!autoUpdater) return;
+  updateManualCheck = manual;
+  autoUpdater.checkForUpdates().catch(() => {});  // 오류는 "error" 이벤트에서 처리
+}
+
 // ── 앱 시작 ──
 
 // 영상 소리 자동재생 허용
@@ -1532,6 +1605,8 @@ app.commandLine.appendSwitch('disable-features', 'PreloadMediaEngagementData,Med
 app.whenReady().then(() => {
   buildMenu();
   createMainWindow();
+  setupAutoUpdater();
+  setTimeout(() => checkForUpdates(false), 5000);  // 시작 직후 부담을 줄이려 5초 뒤 확인
 
   // macOS: 독에서 앱 아이콘 클릭 시 창이 모두 닫혀 있으면 새 창 생성
   app.on("activate", () => {
