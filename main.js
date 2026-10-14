@@ -77,7 +77,9 @@ function loadSettings() {
 
 const AI_PROVIDERS = ["gemini", "openai", "claude"];
 const DEFAULT_MODELS = {
-  gemini: "gemini-2.5-flash",
+  // 2.x 모델은 신규 키에서 404가 나고, gemini-flash-latest(최신 Flash 별칭)는 수요가 몰려
+  // 503이나 수십 초 무응답이 잦다. 신규 키에서도 쓸 수 있고 응답이 빠른 3.5 Flash로 고정한다.
+  gemini: "gemini-3.5-flash",
   openai: "gpt-4o-mini",
   claude: "claude-3-5-haiku-latest"
 };
@@ -207,7 +209,8 @@ function describeAIError(provider, model, err) {
            `· 입력한 키가 ${label} 키인지 확인해 주세요. ${hint}`;
 
   } else if (status >= 500 || /overloaded|unavailable|high demand|internal error/.test(lower)) {
-    head = `${label} 서버가 일시적으로 불안정합니다. 잠시 뒤 다시 시도해 주세요.`;
+    head = `${label} 서버가 일시적으로 혼잡합니다(키·모델 문제 아님). 1~2분 뒤 다시 시도해 주세요.` +
+           (provider === "gemini" ? `\n· 계속되면 설정의 "모델 이름"에 ${GEMINI_BUSY_FALLBACK_MODEL} 를 넣어 보세요.` : "");
 
   } else if (/fetch failed|enotfound|econnrefused|econnreset|etimedout|timeout|network|getaddrinfo|certificate|self signed|proxy/.test(lower)) {
     head = `${label} 서버에 연결할 수 없습니다.\n` +
@@ -231,15 +234,72 @@ function describeAIError(provider, model, err) {
 // 호출 코드가 여러 곳에 흩어져 있어 오류 처리가 제각각이었다.
 // 아래 세 함수로 모아 두고, 실패는 항상 describeAIError()를 거쳐 나가게 한다.
 
-/** Gemini 텍스트 생성 1회 */
+// 503(혼잡)·응답 지연 시 마지막으로 넘어갈 가벼운 모델. Flash보다 수요가 적어 대체로 응답한다.
+// 주의: gemini-3.5-flash-lite / gemini-flash-lite-latest는 번역 요청에 한국어 원문을 그대로 돌려주므로 쓰지 않는다.
+const GEMINI_BUSY_FALLBACK_MODEL = "gemini-3.1-flash-lite";
+
+// AI 요청 1회의 최대 대기 시간. 넘기면 끊고 오류(또는 대체 모델)로 넘어가 무한 로딩을 막는다.
+const AI_REQUEST_TIMEOUT_MS = 90000;
+
+/** 요청 시간 초과로 끊긴 오류인지 판단 */
+function isTimeoutError(err) {
+  const name = String(err?.name || "");
+  return name === "TimeoutError" || name === "AbortError" || /aborted|timed? ?out/i.test(String(err?.message || ""));
+}
+
+/** 시간 초과 오류를 사용자에게 보여줄 메시지로 바꾼다 */
+function timeoutError(provider) {
+  const label = { gemini: "Gemini", openai: "OpenAI", claude: "Claude" }[provider] || provider;
+  return new Error(`${label} 서버가 ${AI_REQUEST_TIMEOUT_MS / 1000}초 동안 응답하지 않습니다(키 문제 아님). 잠시 뒤 다시 시도해 주세요.`);
+}
+
+/** Gemini 서버 혼잡(503/overloaded) 또는 응답 지연 오류인지 판단 */
+function isGeminiBusy(err) {
+  const status = extractStatusCode(err);
+  const lower  = String(err?.message || err || "").toLowerCase();
+  return status === 503 || status === 529 || /unavailable|overloaded|high demand/.test(lower) || isTimeoutError(err);
+}
+
+/**
+ * Gemini 텍스트 생성.
+ * 혼잡(503)이면 잠시 쉬었다가 한 번 재시도하고, 그래도 안 되면(또는 응답이 너무 늦으면)
+ * Flash-Lite로 한 번 더 시도한다.
+ */
 async function callGeminiText(apiKey, model, prompt) {
-  try {
-    const ai = new GoogleGenAI({ apiKey });
-    const resp = await ai.models.generateContent({ model, contents: prompt });
+  const ai = new GoogleGenAI({ apiKey });
+  const generate = async (m) => {
+    const resp = await ai.models.generateContent({
+      model: m,
+      contents: prompt,
+      config: { abortSignal: AbortSignal.timeout(AI_REQUEST_TIMEOUT_MS) }
+    });
     return resp.text || "";
-  } catch (err) {
-    throw describeAIError("gemini", model, err);
+  };
+
+  const delays = [3000];  // 503 재시도 전 대기(ms). 시간 초과는 재시도하지 않고 바로 대체 모델로 간다
+  let lastErr = null;
+
+  for (let attempt = 0; attempt <= delays.length; attempt++) {
+    try {
+      return await generate(model);
+    } catch (err) {
+      lastErr = err;
+      if (!isGeminiBusy(err) || isTimeoutError(err) || attempt === delays.length) break;
+      await new Promise(r => setTimeout(r, delays[attempt]));
+    }
   }
+
+  if (isGeminiBusy(lastErr) && model !== GEMINI_BUSY_FALLBACK_MODEL) {
+    try {
+      return await generate(GEMINI_BUSY_FALLBACK_MODEL);
+    } catch (fallbackErr) {
+      if (isTimeoutError(fallbackErr)) throw timeoutError("gemini");
+      throw describeAIError("gemini", GEMINI_BUSY_FALLBACK_MODEL, fallbackErr);
+    }
+  }
+
+  if (isTimeoutError(lastErr)) throw timeoutError("gemini");
+  throw describeAIError("gemini", model, lastErr);
 }
 
 /**
@@ -257,7 +317,8 @@ async function callOpenAIChat(apiKey, model, messages, options = {}) {
     const resp = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(AI_REQUEST_TIMEOUT_MS)
     });
 
     const data = await resp.json().catch(() => ({}));
@@ -273,6 +334,7 @@ async function callOpenAIChat(apiKey, model, messages, options = {}) {
   try {
     return await request(true);
   } catch (err) {
+    if (isTimeoutError(err)) throw timeoutError("openai");
     const msg = String(err?.message || "").toLowerCase();
     if (err?.status === 400 && (err?.param === "temperature" || msg.includes("temperature"))) {
       try {
@@ -300,7 +362,8 @@ async function callClaudeMessages(apiKey, model, prompt, maxTokens = 2048) {
         max_tokens: maxTokens,
         temperature: 0.2,
         messages: [{ role: "user", content: prompt }]
-      })
+      }),
+      signal: AbortSignal.timeout(AI_REQUEST_TIMEOUT_MS)
     });
 
     const data = await resp.json().catch(() => ({}));
@@ -311,6 +374,7 @@ async function callClaudeMessages(apiKey, model, prompt, maxTokens = 2048) {
     }
     return Array.isArray(data?.content) ? data.content.map(part => part.text || "").join("\n") : "";
   } catch (err) {
+    if (isTimeoutError(err)) throw timeoutError("claude");
     throw describeAIError("claude", model, err);
   }
 }
@@ -323,7 +387,16 @@ function ensureSettingsShape(raw = {}) {
 
   for (const provider of AI_PROVIDERS) {
     settings.models[provider] = String(settings.models[provider] || "").trim();
+  }
 
+  // 2.x Gemini 모델은 신규 키에서 404(NOT_FOUND)를 낸다. 저장돼 있으면 비워서 기본 모델을 쓰게 한다.
+  // gemini-flash-latest는 혼잡으로 무응답이 잦고, 일부 flash-lite(3.5-flash-lite, flash-lite-latest)는 번역 대신 한국어를 그대로 돌려준다.
+  if (/^gemini-(1\.|2\.)/i.test(settings.models.gemini) ||
+      /^gemini-(flash-latest|flash-lite-latest|3\.5-flash-lite)$/i.test(settings.models.gemini)) {
+    settings.models.gemini = "";
+  }
+
+  for (const provider of AI_PROVIDERS) {
     // 예전에 공백·줄바꿈이 섞인 채로 저장된 키도 여기서 한 번 정리한다
     if (settings.aiApiKeys[provider]) {
       settings.aiApiKeys[provider] = sanitizeApiKey(settings.aiApiKeys[provider]);
@@ -633,6 +706,7 @@ ${linesRule}
 - 선택된 언어만 translations 안에 넣는다: ${translationLanguages}
 - 영어는 translations.en 배열에 넣는다.
 - 일본어는 translations.ja 배열에 넣는다.
+- 번역 배열에는 반드시 해당 언어(영어는 영어, 일본어는 히라가나·가타카나·한자로 쓴 일본어)로 번역한 문장만 넣는다. 한국어 원문을 그대로 복사하거나 한글을 넣지 마라.
 - 번역도 원본 lines와 같은 의미를 유지하고 ${translationLinesRule}.
 - 번역문의 문장부호는 원문(한국어)과 똑같이 맞춘다. 원문 줄 끝에 마침표(.)나 쉼표(,)가 없으면 영어·일본어 번역 줄 끝에도 절대 붙이지 마라.
 - 영어의 마침표(.), 쉼표(,), 일본어의 구점(。), 독점(、), 물음표(?/？), 느낌표(!/！) 모두 해당한다. 원문에 없으면 번역에도 넣지 않는다.
@@ -906,6 +980,90 @@ function getModelForProvider(settings, provider) {
   return normalized.models[provider] || DEFAULT_MODELS[provider] || "";
 }
 
+/** 설정에서 선택된 AI 제공자에게 텍스트 프롬프트 1회를 보낸다. */
+async function callSelectedProviderText(settings, prompt, maxTokens = 2048) {
+  const provider = settings.aiProvider || "gemini";
+  const apiKey   = getAIKey(settings, provider);
+  if (!apiKey) throw missingKeyError(provider);
+  const model = getModelForProvider(settings, provider);
+
+  if (provider === "gemini") return await callGeminiText(apiKey, model, prompt);
+  if (provider === "openai") {
+    return await callOpenAIChat(apiKey, model, [
+      { role: "system", content: "Return only valid JSON. No markdown." },
+      { role: "user",   content: prompt }
+    ]);
+  }
+  if (provider === "claude") return await callClaudeMessages(apiKey, model, prompt, maxTokens);
+  throw new Error("지원하지 않는 AI 제공자입니다: " + provider);
+}
+
+// ── 번역 결과 검증 ──
+//
+// 프롬프트가 한국어로 쓰여 있다 보니, 일부 모델(특히 새 키에 붙는 최신 Gemini)이
+// "ja"/"en" 칸에 번역 대신 한국어 원문을 그대로 넣어 보내는 경우가 있다.
+// 응답을 받은 뒤 번역 줄에 한글이 섞였거나 비어 있으면, 해당 줄만 따로 번역을 다시 요청한다.
+
+const HANGUL_RE = /[ᄀ-ᇿ㄰-㆏가-힯]/;
+const TRANSLATION_LANG_NAMES = { en: "English (영어)", ja: "Japanese (일본어, 日本語)" };
+
+/** 번역 줄 배열이 비었거나 한글이 섞여 있어 번역이 제대로 안 된 상태인지 */
+function isUntranslated(lines) {
+  return !Array.isArray(lines) || lines.length === 0 || lines.some(line => HANGUL_RE.test(String(line || "")));
+}
+
+/**
+ * 번역이 안 된(한국어가 그대로 들어온) 슬라이드만 골라 해당 언어로 다시 번역한다.
+ *
+ * @param {Array}    slides    - 슬라이드 배열 (입력 배열을 직접 수정한다)
+ * @param {Object}   settings  - 설정 객체 (AI 제공자 선택용)
+ * @param {string}   lang      - 'en' | 'ja'
+ * @param {Function} getSource - 슬라이드에서 한국어 원문 줄 배열을 꺼내는 함수
+ * @param {Function} getTarget - 슬라이드에서 번역 줄 배열을 꺼내는 함수
+ * @param {Function} setTarget - 번역 줄 배열을 슬라이드에 다시 넣는 함수
+ */
+async function repairUntranslatedLines(slides, settings, lang, getSource, getTarget, setTarget) {
+  const broken = slides.filter(slide => isUntranslated(getTarget(slide)));
+  if (!broken.length) return slides;
+
+  const langName = TRANSLATION_LANG_NAMES[lang] || lang;
+  const sources  = broken.map(slide => getSource(slide).join("\n"));
+
+  const prompt = `Translate each Korean worship-song lyric below into natural ${langName}.
+Rules:
+- Output ONLY a JSON array of strings, one translated string per input item, same order, same count (${sources.length}).
+- Every output string MUST be written in ${langName}. Never copy the Korean text. Never output any Hangul (한글) characters.
+- If an input item contains a line break, keep the same line break in the translation.
+- Do not add a period (.) or Japanese full stop (。) at the end unless the Korean line has one.
+
+Input (JSON array of Korean strings):
+${JSON.stringify(sources, null, 2)}`;
+
+  let translated = null;
+  for (let attempt = 0; attempt < 2 && !translated; attempt++) {
+    const text = await callSelectedProviderText(settings, prompt, 4096);
+    try {
+      const parsed = JSON.parse(cleanAIJsonText(text));
+      if (Array.isArray(parsed) && parsed.length === sources.length &&
+          parsed.every(item => typeof item === "string" && item.trim() && !HANGUL_RE.test(item))) {
+        translated = parsed;
+      }
+    } catch (_) { /* 형식이 틀리면 한 번 더 시도 */ }
+  }
+
+  if (!translated) {
+    const label = lang === "ja" ? "일본어" : lang === "en" ? "영어" : lang;
+    throw new Error(`AI가 ${label} 번역 대신 한국어를 돌려보냈습니다. 다시 시도해 주세요.\n` +
+                    `· 계속되면 설정에서 다른 모델이나 AI 제공자를 선택해 보세요.`);
+  }
+
+  broken.forEach((slide, idx) => {
+    const lines = translated[idx].split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    setTarget(slide, matchPunctuationToSource(getSource(slide), lines));
+  });
+  return slides;
+}
+
 // ── AI 제공자별 가사 분리 함수 ──
 
 /**
@@ -1002,11 +1160,24 @@ async function splitLyricsBySelectedProvider(lyrics, settings, translateTo = [],
     ? { ...settings, maxLinesPerSlide: maxLinesOverride }
     : settings;
 
-  if (provider === "gemini")  return await splitLyricsWithGemini(lyrics, effectiveSettings, safeTranslate);
-  if (provider === "openai")  return await splitLyricsWithOpenAI(lyrics, effectiveSettings, safeTranslate);
-  if (provider === "claude")  return await splitLyricsWithClaude(lyrics, effectiveSettings, safeTranslate);
+  let slides;
+  if      (provider === "gemini") slides = await splitLyricsWithGemini(lyrics, effectiveSettings, safeTranslate);
+  else if (provider === "openai") slides = await splitLyricsWithOpenAI(lyrics, effectiveSettings, safeTranslate);
+  else if (provider === "claude") slides = await splitLyricsWithClaude(lyrics, effectiveSettings, safeTranslate);
+  else throw new Error("지원하지 않는 AI 제공자입니다: " + provider);
 
-  throw new Error("지원하지 않는 AI 제공자입니다: " + provider);
+  // 번역 칸에 한국어가 그대로 들어온 슬라이드는 다시 번역한다
+  for (const lang of ["en", "ja"]) {
+    if (!safeTranslate.includes(lang)) continue;
+    await repairUntranslatedLines(
+      slides, effectiveSettings, lang,
+      slide => slide.lines,
+      slide => slide.translations?.[lang],
+      (slide, lines) => { slide.translations[lang] = lines; }
+    );
+  }
+
+  return slides;
 }
 
 // IPC 핸들러: 구버전 호환용 (Gemini 고정)
@@ -1087,12 +1258,12 @@ ${kr}
 `;
 
   if (hasEn)      prompt += `\n영어 (아래 텍스트를 한국어와 같은 수의 슬라이드로 분할):\n${en}\n`;
-  else if (genEn) prompt += `\n영어: (한국어에서 자연스럽게 번역해서 생성)\n`;
+  else if (genEn) prompt += `\n영어: (한국어를 자연스러운 영어로 번역해서 생성. "en" 값은 반드시 영어 문장이어야 하며 한국어(한글)를 절대 넣지 마라)\n`;
 
   if (hasJa)      prompt += `\n일본어 (아래 텍스트를 한국어와 같은 수의 슬라이드로 분할):\n${ja}\n`;
-  else if (genJa) prompt += `\n일본어: (한국어에서 자연스럽게 번역해서 생성)\n`;
+  else if (genJa) prompt += `\n일본어: (한국어를 자연스러운 일본어로 번역해서 생성. "ja" 값은 반드시 히라가나·가타카나·한자로 쓴 일본어 문장이어야 하며 한국어(한글)를 절대 넣지 마라)\n`;
 
-  const enField = needEn ? `"en": ["영어 줄 1"], ` : "";
+  const enField = needEn ? `"en": ["English line 1"], ` : "";
   const jaField = needJa ? `"ja": ["日本語 1行目"]`   : "";
 
   prompt += `
@@ -1205,7 +1376,18 @@ async function splitMultiLangByProvider(kr, en, ja, settings, genEn=false, genJa
     throw new Error("지원하지 않는 AI 제공자: " + provider);
   }
 
-  return parseMultiLangSlides(rawText, hasEn, hasJa, genEn, genJa, maxLines, kr, en, ja);
+  const slides = parseMultiLangSlides(rawText, hasEn, hasJa, genEn, genJa, maxLines, kr, en, ja);
+
+  // AI가 새로 번역한 언어인데 한국어가 그대로 들어온 슬라이드는 다시 번역한다
+  // (사용자가 직접 붙여넣은 영어·일본어 가사는 원문이므로 건드리지 않는다)
+  if (!hasEn && genEn) {
+    await repairUntranslatedLines(slides, settings, "en", s => s.kr, s => s.en, (s, lines) => { s.en = lines; });
+  }
+  if (!hasJa && genJa) {
+    await repairUntranslatedLines(slides, settings, "ja", s => s.kr, s => s.ja, (s, lines) => { s.ja = lines; });
+  }
+
+  return slides;
 }
 
 /**
