@@ -4617,6 +4617,47 @@ function pptxFontToKor(fontFace) {
 // ──────────────────────────────────────────────────────────
 const MEDIA_TEMP_DIR = path.join(app.getPath("userData"), "media-temp");
 
+// ──────────────────────────────────────────────────────────
+// 자동 저장 미디어 저장소 (preload의 mediaStoreAPI)
+//   id는 내용 해시라 같은 id면 내용도 같다 → 이미 있으면 다시 쓰지 않는다.
+//   ipcMain.on 메시지는 보낸 순서대로 처리되므로, 종료 요청보다 먼저 보낸 저장은 모두 기록된다.
+// ──────────────────────────────────────────────────────────
+const AUTOSAVE_MEDIA_DIR = path.join(app.getPath("userData"), "autosave-media");
+const _mediaStoreId = id => /^[a-z0-9_]{4,80}$/.test(String(id || "")) ? String(id) : null;
+try { fs.mkdirSync(AUTOSAVE_MEDIA_DIR, { recursive: true }); } catch (e) {}
+
+ipcMain.on("media-store:load", (event, ids) => {
+  const out = {};
+  for (const raw of (Array.isArray(ids) ? ids : [])) {
+    const id = _mediaStoreId(raw);
+    if (!id) continue;
+    try { out[id] = fs.readFileSync(path.join(AUTOSAVE_MEDIA_DIR, id + ".txt"), "utf8"); } catch (e) {}
+  }
+  event.returnValue = out;
+});
+
+ipcMain.on("media-store:put", (event, msg) => {
+  const id = _mediaStoreId(msg && msg.id);
+  if (!id || typeof msg.data !== "string") return;
+  const fp = path.join(AUTOSAVE_MEDIA_DIR, id + ".txt");
+  try {
+    if (!fs.existsSync(fp)) {
+      fs.writeFileSync(fp + ".tmp", msg.data, "utf8");
+      fs.renameSync(fp + ".tmp", fp);
+    }
+  } catch (e) { console.warn("자동 저장 미디어 기록 실패:", e.message); }
+});
+
+ipcMain.on("media-store:gc", (event, keepIds) => {
+  const keep = new Set((Array.isArray(keepIds) ? keepIds : []).map(_mediaStoreId).filter(Boolean));
+  try {
+    for (const f of fs.readdirSync(AUTOSAVE_MEDIA_DIR)) {
+      const id = f.replace(/\.txt(\.tmp)?$/, "");
+      if (!keep.has(id)) { try { fs.unlinkSync(path.join(AUTOSAVE_MEDIA_DIR, f)); } catch (e) {} }
+    }
+  } catch (e) {}
+});
+
 // 앱 시작 시 오래된 임시 미디어만 정리한다.
 //   localStorage 자동저장이 file:// 경로를 참조하므로 최근 파일은 지우면 안 된다
 //   (지우면 재시작 후 영상이 깨짐). 30일 지난 것만 정리해 디스크 누적을 막는다.
@@ -4656,6 +4697,128 @@ ipcMain.handle("media:save-temp", async (event, payload) => {
     return { ok: true, url: absPathToFileUrl(dest) };
   } catch(e) {
     console.error("미디어 임시파일 저장 실패:", e);
+    return { ok: false, message: e.message };
+  }
+});
+
+// ──────────────────────────────────────────────────────────
+// 배경 라이브러리 (preload의 bgLibraryAPI)
+//   그룹 배경으로 한 번 넣은 사진·영상을 userData/bg-library 에 보관해 두고
+//   다음에 그룹을 만들 때 목록에서 바로 고를 수 있게 한다.
+//   index.json : [{ id, name, type:'image'|'video', file, thumb, addedAt }]
+//   슬라이드/그룹은 라이브러리 파일을 직접 가리키지 않고 use 할 때 받은 사본을 쓴다
+//   → 라이브러리에서 지워도 이미 만든 그룹 배경은 그대로 남는다.
+// ──────────────────────────────────────────────────────────
+const BG_LIBRARY_DIR = path.join(app.getPath("userData"), "bg-library");
+const BG_LIBRARY_INDEX = path.join(BG_LIBRARY_DIR, "index.json");
+const _bgLibId = id => /^[a-f0-9]{8,64}$/.test(String(id || "")) ? String(id) : null;
+
+function readBgLibrary() {
+  try {
+    const list = JSON.parse(fs.readFileSync(BG_LIBRARY_INDEX, "utf8"));
+    return Array.isArray(list) ? list.filter(it => it && _bgLibId(it.id) && it.file) : [];
+  } catch (e) { return []; }
+}
+
+function writeBgLibrary(list) {
+  fs.mkdirSync(BG_LIBRARY_DIR, { recursive: true });
+  fs.writeFileSync(BG_LIBRARY_INDEX + ".tmp", JSON.stringify(list), "utf8");
+  fs.renameSync(BG_LIBRARY_INDEX + ".tmp", BG_LIBRARY_INDEX);
+}
+
+function bgLibraryItemOut(it) {
+  return { id: it.id, name: it.name, type: it.type, thumb: it.thumb || null, addedAt: it.addedAt,
+    url: absPathToFileUrl(path.join(BG_LIBRARY_DIR, it.file)) };
+}
+
+ipcMain.handle("bg-library:list", async () => {
+  // 파일이 사라진 항목은 목록에서 뺀다
+  return readBgLibrary()
+    .filter(it => fs.existsSync(path.join(BG_LIBRARY_DIR, it.file)))
+    .sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0))
+    .map(bgLibraryItemOut);
+});
+
+/**
+ * @param {{ name, type:'image'|'video', ext, data: ArrayBuffer|Uint8Array|string(dataURL), thumb?: string }} payload
+ * 같은 내용이 이미 있으면 새로 저장하지 않고 기존 항목을 돌려준다 (최근 사용으로 올림).
+ */
+ipcMain.handle("bg-library:add", async (event, payload) => {
+  try {
+    const { name, type, ext, data, thumb } = payload || {};
+    if (!data || (type !== "image" && type !== "video")) return { ok: false, message: "잘못된 배경 파일입니다." };
+    let buf;
+    let safeExt = String(ext || (type === "video" ? "mp4" : "jpg")).replace(/[^a-z0-9]/gi, "").toLowerCase();
+    if (typeof data === "string") {
+      const m = data.match(/^data:([^;]+);base64,(.+)$/s);
+      if (!m) return { ok: false, message: "이미지 데이터를 읽을 수 없습니다." };
+      buf = Buffer.from(m[2], "base64");
+      safeExt = ({ "image/jpeg": "jpg", "image/png": "png", "image/gif": "gif", "image/webp": "webp" })[m[1]] || safeExt || "jpg";
+    } else {
+      buf = Buffer.from(data);
+    }
+    const id = require("crypto").createHash("sha1").update(buf).digest("hex").slice(0, 24);
+    const list = readBgLibrary();
+    const existing = list.find(it => it.id === id);
+    if (existing && fs.existsSync(path.join(BG_LIBRARY_DIR, existing.file))) {
+      existing.addedAt = Date.now();
+      if (name) existing.name = String(name).slice(0, 200);
+      if (!existing.thumb && thumb) existing.thumb = thumb;
+      writeBgLibrary(list);
+      return { ok: true, item: bgLibraryItemOut(existing) };
+    }
+    fs.mkdirSync(BG_LIBRARY_DIR, { recursive: true });
+    const file = id + "." + (safeExt || "bin");
+    fs.writeFileSync(path.join(BG_LIBRARY_DIR, file), buf);
+    const item = { id, name: String(name || (type === "video" ? "영상" : "사진")).slice(0, 200), type, file,
+      thumb: typeof thumb === "string" && thumb.length < 200000 ? thumb : null, addedAt: Date.now() };
+    writeBgLibrary([item, ...list.filter(it => it.id !== id)]);
+    return { ok: true, item: bgLibraryItemOut(item) };
+  } catch (e) {
+    console.error("배경 라이브러리 저장 실패:", e);
+    return { ok: false, message: e.message };
+  }
+});
+
+/**
+ * 라이브러리 항목을 배경으로 쓸 때 부르는 함수.
+ *   사진 → data URL (기존 사진 배경과 같은 형식)
+ *   영상 → media-temp 에 사본(가능하면 하드링크)을 만들어 그 file:// 경로
+ */
+ipcMain.handle("bg-library:use", async (event, rawId) => {
+  try {
+    const id = _bgLibId(rawId);
+    const it = id && readBgLibrary().find(x => x.id === id);
+    if (!it) return { ok: false, message: "라이브러리에서 배경을 찾을 수 없습니다." };
+    const src = path.join(BG_LIBRARY_DIR, it.file);
+    if (!fs.existsSync(src)) return { ok: false, message: "배경 파일이 없습니다." };
+    if (it.type === "image") {
+      const ext = path.extname(it.file).slice(1).toLowerCase();
+      const mime = ext === "png" ? "image/png" : ext === "gif" ? "image/gif" : ext === "webp" ? "image/webp" : "image/jpeg";
+      return { ok: true, url: "data:" + mime + ";base64," + fs.readFileSync(src).toString("base64") };
+    }
+    fs.mkdirSync(MEDIA_TEMP_DIR, { recursive: true });
+    const dest = path.join(MEDIA_TEMP_DIR, "media_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8) + path.extname(it.file));
+    try { fs.linkSync(src, dest); } catch (e) { fs.copyFileSync(src, dest); }
+    // media-temp는 수정 시각 기준 30일 지나면 정리되므로, 방금 쓴 것으로 표시한다
+    try { const now = new Date(); fs.utimesSync(dest, now, now); } catch (e) {}
+    return { ok: true, url: absPathToFileUrl(dest) };
+  } catch (e) {
+    console.error("배경 라이브러리 불러오기 실패:", e);
+    return { ok: false, message: e.message };
+  }
+});
+
+ipcMain.handle("bg-library:remove", async (event, rawId) => {
+  try {
+    const id = _bgLibId(rawId);
+    if (!id) return { ok: false };
+    const list = readBgLibrary();
+    const it = list.find(x => x.id === id);
+    if (it) { try { fs.rmSync(path.join(BG_LIBRARY_DIR, it.file), { force: true }); } catch (e) {} }
+    writeBgLibrary(list.filter(x => x.id !== id));
+    return { ok: true };
+  } catch (e) {
     return { ok: false, message: e.message };
   }
 });
@@ -4742,6 +4905,11 @@ function writeProjectBundle(projectData, savePath) {
     }
   }
 
+  // groups 처리: 그룹 배경 이미지/영상도 함께 저장
+  const processedGroups = (projectData.groups || []).map(g =>
+    (g && g.bg && g.bg.mediaURL) ? { ...g, bg: { ...g.bg, mediaURL: resolveMediaUrl(g.bg.mediaURL) } } : g
+  );
+
   // 로컬 경로 파일을 ZIP에 추가
   for (const [filePath, entryName] of pathToEntry) {
     try {
@@ -4752,7 +4920,7 @@ function writeProjectBundle(projectData, savePath) {
   }
 
   // 나머지 프로젝트 데이터를 직렬화 (slides, namedLayouts는 처리된 버전으로 교체)
-  const data = { ...projectData, slides: processedSlides, namedLayouts: processedNamedLayouts };
+  const data = { ...projectData, groups: processedGroups, slides: processedSlides, namedLayouts: processedNamedLayouts };
   zip.addFile("project.wsproj.json", Buffer.from(JSON.stringify(data, null, 2), "utf8"));
 
   zip.writeZip(savePath);
@@ -4912,6 +5080,11 @@ ipcMain.handle("project:open-bundle", async (event, opts) => {
 
     for (const slide of data.slides) {
       slide.mediaURL = restoreMediaUrl(slide.mediaURL);
+    }
+
+    // 그룹 배경 경로 복원
+    for (const g of (data.groups || [])) {
+      if (g && g.bg && g.bg.mediaURL) g.bg.mediaURL = restoreMediaUrl(g.bg.mediaURL);
     }
 
     // namedLayouts에 포함된 배경 이미지/영상 경로도 복원

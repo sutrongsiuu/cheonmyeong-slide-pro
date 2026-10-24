@@ -1,6 +1,6 @@
 {
   "name": "cheonmyeongslidepro",
-  "version": "1.5.3",
+  "version": "1.6.0",
   "description": "예배 슬라이드 프레젠테이션 앱",
   "main": "main.js",
   "scripts": {
@@ -22,6 +22,8 @@
     "files": [
       "main.js",
       "pptxExport.js",
+      "videoLoop.js",
+      "groupBgLayer.js",
       "preload.js",
       "index.html",
       "screen.html",

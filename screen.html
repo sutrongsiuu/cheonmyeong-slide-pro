@@ -50,6 +50,8 @@ body{position:relative;}
   이미지와 영상은 object-fit:cover로 화면에 꽉 채운다.
 */
 .ml{position:absolute;inset:0;overflow:hidden;}
+/* #GBG — 그룹 배경 영상 레이어 (groupBgLayer.js). 두 레이어 아래에서 하나의 영상을 이어서 재생 */
+#GBG{position:absolute;inset:0;overflow:hidden;pointer-events:none;opacity:0;z-index:0;}
 .ml img,.ml video{position:absolute;object-fit:cover;display:block;max-width:none;max-height:none;}
 
 /* .ov — 색상 오버레이 레이어 (현재 미사용, 확장용) */
@@ -155,6 +157,7 @@ body{position:relative;}
   </div>
   <div class="etl" id="XB"></div>
 </div>
+<div id="GBG"></div>
 </div>
 
 <!-- 자동재생 진행 바 (width가 0→100%로 채워지는 애니메이션) -->
@@ -173,6 +176,8 @@ body{position:relative;}
 <!-- 위치 마커 선 (오른쪽 끝 고정, 위아래로만 이동) -->
 <div id="markerLine"></div>
 
+<script src="videoLoop.js"></script>
+<script src="groupBgLayer.js"></script>
 <script>
 // ─── 텍스트 그림자 효과 ─────────────────────────────────────
 // 텍스트에 적용하는 그림자 CSS 문자열을 계산한다.
@@ -286,8 +291,36 @@ let _videoCancelFn = null
 // 편집 미리보기가 이 보고값을 받아 재생 속도를 미세 조정해 따라온다.
 let _vidLayer = 'A'
 
+// 그룹 배경 영상 레이어 (같은 그룹 영상을 쓰는 슬라이드끼리는 영상을 이어서 재생)
+let _gbgLayer = null
+function _getGbgLayer(){
+  if (!_gbgLayer && window.GroupBgLayer) {
+    _gbgLayer = GroupBgLayer.create(document.getElementById('GBG'), {
+      takeVideo: spec => _takeWarm(spec.key, spec.url),
+      onAwaitPlay: (v, spec) => {
+        // 클릭 시 재생: 화면을 한 번 클릭하면 시작
+        _clearClickToPlay()
+        _clickToPlayHandler = () => { v.muted = !spec.audio; v.play().catch(() => {}); _clickToPlayHandler = null }
+        document.addEventListener('click', _clickToPlayHandler, { once: true })
+      }
+    })
+  }
+  return _gbgLayer
+}
+/** 슬라이드 데이터의 gbg에 맞춰 그룹 영상 레이어를 보이거나 숨긴다 */
+function _updateGroupBg(d, fd){
+  const layer = _getGbgLayer()
+  if (!layer) return
+  const g = d && d.gbg
+  if (!g) { layer.hide(fd); return }
+  if (g.key && g.url) _mediaCache[g.key] = g.url
+  const url = (g.key && _mediaCache[g.key]) || g.url
+  layer.show({ ...g, url }, fd)
+}
+
 /** 현재 송출 중인 영상 요소 (없으면 null) */
 function _getOutVid(){
+  if (_gbgLayer && _gbgLayer.active()) return _gbgLayer.video()
   const ml = document.getElementById('M' + _vidLayer)
   return ml ? ml.querySelector('video') : null
 }
@@ -295,12 +328,16 @@ function _getOutVid(){
 function _reportVideoState(){
   if (!window.electronAPI || !window.electronAPI.sendVideoState) return
   const v = _getOutVid()
-  const ml = document.getElementById('M' + _vidLayer)
+  const ml = (_gbgLayer && _gbgLayer.active()) ? document.getElementById('GBG') : document.getElementById('M' + _vidLayer)
   const mId = ml ? ml.dataset.mId : ''
   if (!v || !mId || v.readyState < 1) return
-  window.electronAPI.sendVideoState({ mId, t: v.currentTime, paused: v.paused, at: Date.now() })
+  // dir: 역재생 왕복의 거꾸로 재생 구간이면 -1 (그동안 영상은 멈춘 채 뒤로 탐색하므로 paused만으로는 알 수 없다)
+  const dir = (window.VideoLoop && VideoLoop.reversing(v)) ? -1 : 1
+  // xf: 페이드 반복으로 끝과 처음을 겹치는 중이면 { t: 겹쳐 나오는 영상 위치, p: 진행도 }
+  const xf = window.VideoLoop ? VideoLoop.fadeInfo(v) : null
+  window.electronAPI.sendVideoState({ mId, t: v.currentTime, paused: v.paused, dir, xf, at: Date.now() })
 }
-setInterval(_reportVideoState, 200)
+setInterval(_reportVideoState, 100)
 // 재생 시작·정지·구간 이동 시에는 즉시 보고 (간격을 기다리지 않음)
 ;['playing', 'pause', 'seeked'].forEach(ev => document.addEventListener(ev, e => {
   if (e.target === _getOutVid()) _reportVideoState()
@@ -413,7 +450,7 @@ function _prefetchVideo(data) {
   const mOffY = data.mOffY ?? 50
   const mScale = data.mScale ?? 100
   const mFit = ['cover','contain','fill'].includes(data.mFit) ? data.mFit : 'cover'
-  const key = `${data.mId || url}|${mOffX}|${mOffY}|${mScale}|${mFit}|${!!data.mAudioEnabled}|${data.mLoop !== false}|${data.mAutoPlay !== false}`
+  const key = `${data.mId || url}|${mOffX}|${mOffY}|${mScale}|${mFit}|${!!data.mAudioEnabled}|${data.mLoop !== false}|${data.mAutoPlay !== false}|${data.mLoopMode || 'normal'}|${data.mLoopFade ?? 1}`
   if (_videoPreloadPool[key]) return
   const vid = document.createElement('video')
   vid.src = url
@@ -625,7 +662,7 @@ function fillL (L, d) {
   const mScale = d.mScale ?? 100
   const mFit = ['cover','contain','fill'].includes(d.mFit) ? d.mFit : 'cover'
   // cacheKey: 영상 설정(소리·반복·자동재생)도 포함해 설정 변경 시 비디오 재생성
-  const mCacheKey = `${d.mId || resolvedURL}|${mOffX}|${mOffY}|${mScale}|${mFit}|${!!d.mAudioEnabled}|${d.mLoop!==false}|${d.mAutoPlay!==false}`
+  const mCacheKey = `${d.mId || resolvedURL}|${mOffX}|${mOffY}|${mScale}|${mFit}|${!!d.mAudioEnabled}|${d.mLoop!==false}|${d.mAutoPlay!==false}|${d.mLoopMode || 'normal'}|${d.mLoopFade ?? 1}`
   if (ml.dataset.cacheKey !== mCacheKey) {
     ml.dataset.cacheKey = mCacheKey
     while (ml.firstChild) ml.removeChild(ml.firstChild)
@@ -656,6 +693,8 @@ function fillL (L, d) {
         }
         vid.style.cssText = bgCss
         ml.appendChild(vid)
+        // 반복 방식(처음부터 / 역재생 왕복 / 페이드 반복) 적용
+        if (window.VideoLoop) VideoLoop.attach(vid, { loop: d.mLoop !== false, mode: d.mLoopMode, fade: d.mLoopFade })
         if(autoPlay){
           // 자동 재생: 먼저 음소거로 play() 성공 확보 → 재생 후 소리 설정 적용
           // (Chromium 자동재생 정책은 음소거 재생을 항상 허용)
@@ -741,6 +780,7 @@ function applySlide (d) {
     curEl.querySelectorAll('video').forEach(v => { v.pause(); v.muted = true })
 
     fillL(nL, d)
+    _updateGroupBg(d, fd)
 
     nEl.style.transition = 'none'
     nEl.style.opacity    = '1'
@@ -796,6 +836,7 @@ function applySlide (d) {
     curEl.style.opacity    = '1'
     curEl.style.zIndex     = '2'
     fillL(sL, d)
+    _updateGroupBg(d, 0)
   }
 
   // 발표자 모드: 반투명 오버레이로 현재/다음 슬라이드 텍스트 표시

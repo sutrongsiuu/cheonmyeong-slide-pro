@@ -216,6 +216,36 @@ contextBridge.exposeInMainWorld("appAPI", {
 });
 
 // ──────────────────────────────────────────────────────────
+// 자동 저장 미디어 저장소 API
+//   자동 저장(localStorage)에는 사진·영상 data URL 대신 짧은 참조(@media:id)만 넣고,
+//   실제 데이터는 userData/autosave-media 폴더에 한 번만 저장한다.
+//   같은 배경을 쓰는 슬라이드가 수백 장이어도 저장 용량이 늘지 않는다.
+// ──────────────────────────────────────────────────────────
+contextBridge.exposeInMainWorld("mediaStoreAPI", {
+  // 시작 시 한 번: 참조 id 목록 → { id: dataURL } (동기)
+  loadSync: (ids) => ipcRenderer.sendSync("media-store:load", ids),
+  // 새 미디어 저장 (같은 id는 내용이 같으므로 한 번만 기록)
+  put: (id, data) => ipcRenderer.send("media-store:put", { id, data }),
+  // 현재 프로젝트가 쓰지 않는 미디어 파일 정리
+  gc: (keepIds) => ipcRenderer.send("media-store:gc", keepIds),
+});
+
+// ──────────────────────────────────────────────────────────
+// 배경 라이브러리 API
+//   그룹 배경으로 넣었던 사진·영상을 보관해 두고 다시 고르거나 지운다.
+// ──────────────────────────────────────────────────────────
+contextBridge.exposeInMainWorld("bgLibraryAPI", {
+  // 보관된 배경 목록 (최근 것 먼저)
+  list: () => ipcRenderer.invoke("bg-library:list"),
+  // 배경 추가 { name, type:'image'|'video', ext, data(ArrayBuffer 또는 이미지 data URL), thumb }
+  add: (payload) => ipcRenderer.invoke("bg-library:add", payload),
+  // 배경으로 쓸 URL 받기 (사진: data URL / 영상: 임시 사본 file://)
+  use: (id) => ipcRenderer.invoke("bg-library:use", id),
+  // 라이브러리에서 삭제
+  remove: (id) => ipcRenderer.invoke("bg-library:remove", id),
+});
+
+// ──────────────────────────────────────────────────────────
 // 시스템 폰트 API
 // ──────────────────────────────────────────────────────────
 contextBridge.exposeInMainWorld("fontsAPI", {

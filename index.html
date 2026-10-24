@@ -161,7 +161,9 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text
 .gsls{display:none;}
 .gsls.open{display:block;}
 /* thumb */
-.st{display:flex;align-items:center;gap:8px;padding:6px 8px 6px 24px;cursor:pointer;border-left:2px solid transparent;transition:background .1s;position:relative;}
+.st{display:flex;align-items:center;gap:8px;padding:6px 8px 6px 24px;cursor:pointer;border-left:2px solid transparent;transition:background .1s;position:relative;
+  /* 슬라이드가 1000장이 넘어도 화면에 보이는 줄만 배치·그린다 */
+  content-visibility:auto;contain-intrinsic-size:auto 52px;}
 .st:hover{background:var(--surface);}
 /* 송출 전: 현재 슬라이드는 선택(파란색)과 같은 색으로 표시 */
 .st.cur{background:rgba(124,107,255,.22);border-left:3px solid var(--accent);}
@@ -264,6 +266,8 @@ body.live .gh.cur .gchev{color:var(--red);}
 #LA.layer-inactive,#LB.layer-inactive{pointer-events:none;}
 #LA.layer-inactive *,#LB.layer-inactive *{pointer-events:none!important;}
 .lmedia{position:absolute;inset:0;overflow:hidden;}
+/* 그룹 배경 영상 레이어: 두 슬라이드 레이어 아래에서 하나의 영상을 계속 이어서 재생 (groupBgLayer.js) */
+.gbgLayer{position:absolute;inset:0;overflow:hidden;pointer-events:none;border-radius:6px;opacity:0;}
 .lmedia img,.lmedia video{position:absolute;object-fit:cover;display:block;max-width:none;max-height:none;}
 .bgHandle{position:absolute;width:20px;height:20px;background:rgba(255,255,255,.92);border:1.5px solid rgba(0,0,0,.28);border-radius:4px;z-index:25;display:none;align-items:center;justify-content:center;font-size:13px;color:rgba(0,0,0,.6);user-select:none;pointer-events:auto;}
 .bgHandle.tlH{top:6px;left:6px;cursor:nwse-resize;}
@@ -548,6 +552,39 @@ pointer-events:all;
 .cdots{display:flex;gap:7px;flex-wrap:wrap;}
 .cdot{width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent;}
 .cdot.on{border-color:#fff;}
+/* ── 그룹 배경 선택 ── */
+.gmBgDrop{position:relative;}
+.gmBgBtn{width:100%;height:44px;display:flex;align-items:center;gap:10px;padding:0 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:14px;font-family:'Noto Sans KR',sans-serif;cursor:pointer;text-align:left;}
+.gmBgBtn:hover,.gmBgBtn.open{border-color:var(--accent);}
+.gmBgBtn .arw{margin-left:auto;color:var(--text-dim);font-size:11px;}
+.gmBgThumb{width:48px;height:27px;border-radius:3px;flex-shrink:0;border:1px solid rgba(255,255,255,.15);background:#000 center/cover no-repeat;overflow:hidden;position:relative;}
+.gmBgThumb>video{width:100%;height:100%;object-fit:cover;display:block;}
+.gmBgThumb.none{background:repeating-linear-gradient(45deg,#1b1b26 0 5px,#2a2a40 5px 10px);}
+.gmBgMenu{position:fixed;z-index:3500;background:var(--panel);border:1px solid var(--border);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.75);padding:4px 0;display:none;max-height:min(520px,calc(100vh - 24px));overflow-y:auto;}
+.gmBgItem{display:flex;align-items:center;gap:10px;padding:6px 12px;font-size:14px;color:var(--text-dim);cursor:pointer;}
+.gmBgItem:hover{background:var(--surface2);color:var(--text);}
+.gmBgItem.on{color:var(--accent-txt);background:rgba(124,107,255,.12);}
+.gmBgItem .chk{margin-left:auto;font-size:12px;}
+.gmBgSep{height:1px;background:var(--border);margin:4px 0;}
+.gmBgHead{padding:6px 12px 2px;font-size:12px;color:var(--text-muted);}
+.gmBgItem>span:not(.chk){min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.gmBgItem .del{margin-left:auto;flex-shrink:0;width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:4px;color:var(--text-muted);font-size:15px;line-height:1;}
+.gmBgItem .chk+.del{margin-left:6px;}
+.gmBgItem .del:hover{background:rgba(248,113,113,.18);color:var(--red);}
+.gmBgPreview{position:relative;width:100%;aspect-ratio:16/9;border-radius:8px;border:2px dashed rgba(124,107,255,.55);background:#000 center/cover no-repeat;overflow:hidden;display:flex;align-items:center;justify-content:center;}
+.gmBgPreview.none{background:repeating-linear-gradient(45deg,#16161f 0 12px,#1e1e2c 12px 24px);}
+.gmBgPreview>video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+.gmBgPreview .pvTxt{position:relative;font-family:'Noto Serif KR',serif;font-weight:700;font-size:20px;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.8);pointer-events:none;}
+.gmBgPreview .pvHint{position:absolute;inset:0;display:none;flex-direction:column;gap:6px;align-items:center;justify-content:center;background:rgba(40,30,110,.78);border-radius:6px;color:#fff;font-size:16px;font-weight:700;pointer-events:none;z-index:3;}
+.gmBgPreview .pvHint b{font-size:34px;line-height:1;font-weight:400;}
+.gmBgPreview .pvBadge{position:absolute;left:50%;bottom:8px;transform:translateX(-50%);z-index:2;display:flex;align-items:center;gap:6px;white-space:nowrap;padding:4px 12px;border-radius:999px;background:rgba(0,0,0,.62);border:1px solid rgba(255,255,255,.18);color:#fff;font-size:12px;pointer-events:none;}
+.gmBgPreview.dragover .pvBadge,.gmBgPreview.loading .pvBadge,.gmBgPreview.dragover .pvTxt,.gmBgPreview.loading .pvTxt{visibility:hidden;}
+.gmBgPreview.dragover{border-color:var(--accent);border-style:solid;box-shadow:0 0 0 3px rgba(124,107,255,.35);}
+.gmBgPreview.dragover .pvHint,.gmBgPreview.loading .pvHint{display:flex;}
+.vLoopSel{padding:4px 6px!important;background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:13px!important;font-family:'Noto Sans KR',sans-serif;}
+.vLoopSel:disabled{opacity:.45;}
+.gmBgChk{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-dim);cursor:pointer;}
+.gmBgChk input{width:auto!important;padding:0!important;margin:0;}
 .uparea{border:2px dashed var(--border);border-radius:8px;padding:18px;text-align:center;cursor:pointer;transition:all .12s;font-size:14px;color:var(--text-dim);}
 .uparea:hover{border-color:var(--accent);background:rgba(124,107,255,.05);}
 .upprev{margin-top:10px;display:flex;align-items:center;gap:10px;font-size:14px;color:var(--text);}
@@ -1038,6 +1075,7 @@ pointer-events:all;
               </div>
               <div class="extraTextLayer" id="XB"></div>
             </div>
+            <div class="gbgLayer" id="GBG"></div>
 
             <div class="empty" id="emptyEl">
               <div class="ei">🎵</div>
@@ -1380,9 +1418,50 @@ pointer-events:all;
         <label>그룹 색상</label>
         <div class="cdots" id="GMcolors"></div>
       </div>
+      <div class="fr">
+        <label>그룹 배경</label>
+        <div class="gmBgDrop">
+          <button type="button" class="gmBgBtn" id="GMbgBtn" onclick="toggleGMBgMenu(event)"></button>
+        </div>
+        <div class="gmBgPreview" id="GMbgPreview" title="사진·영상 파일을 여기로 끌어다 놓을 수 있습니다">
+          <div class="pvTxt">미리보기</div>
+          <div class="pvHint"><b>⤓</b><span id="GMbgPvHint">놓으면 바로 그룹 배경으로 적용됩니다</span></div>
+          <div class="pvBadge">⤓ 사진·영상 파일을 여기로 끌어다 놓으면 바로 적용돼요</div>
+        </div>
+        <input id="GMbgFile" type="file" accept="image/*,video/*" style="display:none;" onchange="pickGMBgFile(event)">
+        <input id="GMbgColor" type="color" value="#334155" style="display:none;" oninput="pickGMBgColor(this.value)">
+        <div id="GMbgVideoOpts" style="display:none;gap:16px;">
+          <label class="gmBgChk"><input type="checkbox" id="GMbgAudio" onchange="if(gmBg)gmBg.mediaAudioEnabled=this.checked"> 소리 켜기</label>
+          <label class="gmBgChk"><input type="checkbox" id="GMbgLoop" checked onchange="if(gmBg){gmBg.mediaLoop=this.checked;renderGMBg();}"> 반복 재생</label>
+          <select id="GMbgLoopMode" class="vLoopSel" title="반복 방식" onchange="if(gmBg){gmBg.mediaLoopMode=this.value;renderGMBg();}">
+            <option value="normal">처음부터 다시 반복</option>
+            <option value="pingpong">역재생 왕복</option>
+            <option value="crossfade">페이드 반복</option>
+          </select>
+          <select id="GMbgLoopFade" class="vLoopSel" title="페이드 길이" onchange="if(gmBg){gmBg.mediaLoopFade=parseFloat(this.value)||1;renderGMBg();}">
+            <option value="0.5">0.5초</option><option value="1">1초</option><option value="2">2초</option><option value="3">3초</option>
+          </select>
+        </div>
+        <div id="GMbgInfo" style="font-size:13px;color:var(--text-dim);line-height:1.6;"></div>
+      </div>
       <div class="macts">
         <button class="tb" onclick="closeM('GM')">취소</button>
         <button class="tb pri" onclick="saveGrp()">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="gmBgMenu" id="GMbgMenu"></div>
+
+  <div class="mback" id="GBGASK" style="z-index:260;">
+    <div class="mbox" style="width:440px;">
+      <h3>그룹 배경 바꾸기</h3>
+      <div id="GBGASKmsg" style="font-size:14px;color:var(--text);line-height:1.8;margin-bottom:6px;"></div>
+      <div style="font-size:13px;color:var(--text-dim);line-height:1.7;">배경이 없는 슬라이드에는 새 배경이 바로 적용됩니다.</div>
+      <div class="macts">
+        <button class="tb" onclick="closeM('GBGASK')">취소</button>
+        <button class="tb" id="GBGASKkeep">기존 배경 유지</button>
+        <button class="tb pri" id="GBGASKall">모두 바꾸기</button>
       </div>
     </div>
   </div>
@@ -1571,6 +1650,17 @@ pointer-events:all;
             <span style="font-size:13px;color:var(--text-dim);">끄면 한번만 재생</span>
           </div>
           <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:14px;color:var(--text-dim);white-space:nowrap;flex-shrink:0;">반복 방식</span>
+            <select id="videoLoopModeSel" class="vLoopSel" style="flex:1;" onchange="pmLoopMode=this.value;_syncVideoSettingsBtns()">
+              <option value="normal">처음부터 다시 반복</option>
+              <option value="pingpong">역재생 왕복 (끝나면 거꾸로 재생)</option>
+              <option value="crossfade">페이드 반복 (끝과 처음을 겹쳐 이어줌)</option>
+            </select>
+            <select id="videoLoopFadeSel" class="vLoopSel" style="width:84px;display:none;" title="페이드 길이" onchange="pmLoopFade=parseFloat(this.value)||1">
+              <option value="0.5">0.5초</option><option value="1">1초</option><option value="2">2초</option><option value="3">3초</option>
+            </select>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
             <span style="font-size:14px;color:var(--text-dim);white-space:nowrap;flex-shrink:0;">재생 방식</span>
             <select id="videoAutoPlaySel" style="flex:1;padding:4px 6px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:14px;font-family:'Noto Sans KR',sans-serif;" onchange="pmAutoPlay=this.value!=='false'">
               <option value="true">자동 재생 (슬라이드 전환 시 바로 재생)</option>
@@ -1579,6 +1669,10 @@ pointer-events:all;
           </div>
         </div>
         <button class="tb" id="clearMed" style="display:none; color:var(--red);" onclick="removeMed()">배경 제거</button>
+        <div id="SMgroupBgRow" style="display:none;align-items:center;gap:8px;margin-top:4px;padding:8px 10px;border:1px dashed var(--border);border-radius:6px;font-size:13px;color:var(--text-dim);">
+          <span id="SMgroupBgText" style="flex:1;line-height:1.5;"></span>
+          <button type="button" class="tb" style="height:28px;font-size:13px;flex-shrink:0;" onclick="useGroupBgInSM()">그룹 배경으로 되돌리기</button>
+        </div>
       </div>
   
       <div class="fr border-top sm-hide-on-edit">
@@ -1664,6 +1758,8 @@ pointer-events:all;
   </div>
 
 
+<script src="videoLoop.js"></script>
+<script src="groupBgLayer.js"></script>
 <script>
 /**
  * index.html — 메인 조작창 (렌더러 프로세스)
@@ -2469,6 +2565,7 @@ window.makeSlidesWithAI = async function makeSlidesWithAI(){
         mediaType:typeof pmType!=='undefined' ? pmType : '',
         mediaAudioEnabled:typeof pmAudioEnabled!=='undefined' ? pmAudioEnabled===true : false,
         mediaLoop:typeof pmLoopEnabled!=='undefined' ? pmLoopEnabled!==false : true,
+        mediaLoopMode:pmLoopMode, mediaLoopFade:pmLoopFade,
         mediaAutoPlay:typeof pmAutoPlay!=='undefined' ? pmAutoPlay!==false : true,
         layoutType:(aiBase&&aiBase.layoutType)||document.getElementById('SMlayout')?.value||'centerLyrics',
         layoutName:aiDefaultLayoutName||(document.getElementById('SMlayoutName')?.value||'').trim()||'',
@@ -2483,6 +2580,7 @@ window.makeSlidesWithAI = async function makeSlidesWithAI(){
       throw new Error('AI가 생성한 슬라이드가 없습니다.');
     }
 
+    applyGroupBgToNewSlides(newSlides,true);
     slides.push(...newSlides);
 
     if(typeof setActiveGroup==='function'){
@@ -2758,6 +2856,8 @@ let pmType=null;          // 미디어 타입 ('image' 또는 'video')
 let pmAudioEnabled=false; // 영상 소리 재생 여부 (video일 때만 유효)
 let pmLoopEnabled=true;   // 영상 반복 재생 여부
 let pmAutoPlay=true;      // 영상 자동 재생 여부 (false=클릭 시 재생)
+let pmLoopMode='normal';  // 영상 반복 방식 ('normal' | 'pingpong' 역재생 왕복 | 'crossfade' 페이드 반복)
+let pmLoopFade=1;         // 페이드 반복 시 겹치는 시간(초)
 // 배경 미디어 위치·크기 (레이아웃 저장/적용에 사용 — 슬라이드의 mediaOffX/OffY/Scale/Fit와 1:1 대응)
 let pmOffX=50;            // 배경 가로 위치 (%)
 let pmOffY=50;            // 배경 세로 위치 (%)
@@ -3029,6 +3129,43 @@ function getFade(){
 // renderAll() 호출 시마다 자동으로 saveProject()가 호출된다.
 const PROJECT_STORAGE_KEY='worshipslide-pro-project-v1';
 
+// ─── 미디어 참조 (자동 저장·실행 취소 용량 절약) ─────────────────
+// 같은 그룹 배경처럼 슬라이드 수백 장이 같은 사진 data URL을 쓰면, 그대로 직렬화할 때
+// 같은 데이터가 수백 번 복사되어 자동 저장 용량(약 10MB)을 넘기고 실행 취소 스냅샷도 거대해진다.
+// 직렬화할 때 큰 data URL을 '@media:id'로 바꾸고, 실제 데이터는 한 번만 보관한다.
+//   - 실행 취소: 메모리의 id↔data 표로 복원
+//   - 자동 저장: userData/autosave-media 폴더에 파일로 한 번만 저장 (mediaStoreAPI)
+const _MEDIA_REF='@media:';
+const _mediaById=new Map(), _mediaIdByUrl=new Map(), _mediaPersisted=new Set();
+let _mediaRefsUsed=null; // 직렬화 중 쓰인 id 모음
+
+/** 내용 해시로 만든 id (같은 내용이면 항상 같은 id) */
+function _mediaHashId(s){
+  let h1=0x811c9dc5, h2=0x01000193;
+  for(let i=0;i<s.length;i++){
+    const c=s.charCodeAt(i);
+    h1=Math.imul(h1^c,16777619)>>>0;
+    h2=Math.imul(h2+c,2246822519)>>>0; h2=(h2<<13|h2>>>19)>>>0;
+  }
+  return 'm'+h1.toString(36)+h2.toString(36)+'_'+s.length.toString(36);
+}
+function _mediaReplacer(k,v){
+  if(typeof v==='string' && v.length>4096 && v.startsWith('data:')){
+    let id=_mediaIdByUrl.get(v);
+    if(!id){ id=_mediaHashId(v); _mediaIdByUrl.set(v,id); _mediaById.set(id,v); }
+    if(_mediaRefsUsed) _mediaRefsUsed.add(id);
+    return _MEDIA_REF+id;
+  }
+  return v;
+}
+function _mediaReviver(k,v){
+  if(typeof v==='string' && v.startsWith(_MEDIA_REF)){
+    const u=_mediaById.get(v.slice(_MEDIA_REF.length));
+    return u!==undefined ? u : null;
+  }
+  return v;
+}
+
 /** 현재 groups/slides 상태를 localStorage에 저장 */
 function saveProject(){
   try{
@@ -3047,7 +3184,17 @@ function saveProject(){
       fade:document.getElementById('fadeI')?.value||'0',
       interval:document.getElementById('itvI')?.value||'4',
     };
-    localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(data));
+    const store=window.mediaStoreAPI;
+    if(store){
+      // 미디어는 파일 저장소로 (새 것만), 자동 저장에는 참조만
+      _mediaRefsUsed=new Set();
+      const json=JSON.stringify(data,_mediaReplacer);
+      const used=_mediaRefsUsed; _mediaRefsUsed=null;
+      used.forEach(id=>{ if(!_mediaPersisted.has(id)){ store.put(id,_mediaById.get(id)); _mediaPersisted.add(id); } });
+      localStorage.setItem(PROJECT_STORAGE_KEY, json);
+    }else{
+      localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(data));
+    }
   }catch(e){
     console.error('프로젝트 자동 저장 실패:', e);
   }
@@ -3063,7 +3210,7 @@ const _UNDO_LIMIT = 50  // 최대 50단계까지 실행 취소 가능
 /** "변경 직전" 스냅샷을 떠 둔다. 드래그·리사이즈처럼 변동 여부가 mouseup 시점에 결정되는
  *  인터랙션은 mousedown에서 스냅샷을 떠 두고, 실제 변동이 있었을 때만 _pushUndoSnapshot으로 등록한다. */
 function _takeUndoSnapshot(){
-  return JSON.stringify({groups, slides, curIdx, activeGroupId, namedLayouts:getNamedLayouts()})
+  return JSON.stringify({groups, slides, curIdx, activeGroupId, namedLayouts:getNamedLayouts()}, _mediaReplacer)
 }
 
 /** 미리 떠 둔 스냅샷을 Undo 스택에 등록 */
@@ -3089,7 +3236,7 @@ function _syncUndoBtns(){
 }
 
 function _applyUndoState(stateJson){
-  const st=JSON.parse(stateJson)
+  const st=JSON.parse(stateJson,_mediaReviver)
   groups=st.groups
   slides=st.slides.map(s=>({layoutType:'centerLyrics',textX:50,textY:50,textBoxes:[],shapeBoxes:[],...s,
     textBoxes:typeof normalizeTextBoxes==='function'?normalizeTextBoxes(s.textBoxes||[]):(s.textBoxes||[]),
@@ -3171,7 +3318,21 @@ function loadProject(){
     const raw=localStorage.getItem(PROJECT_STORAGE_KEY);
     if(!raw) return false;
 
-    const data=JSON.parse(raw);
+    // 참조(@media:id)로 저장된 미디어를 저장소에서 불러온다
+    let reviver;
+    if(raw.includes(_MEDIA_REF) && window.mediaStoreAPI){
+      const ids=[...new Set([...raw.matchAll(/@media:([a-z0-9_]+)/g)].map(m=>m[1]))];
+      const got=window.mediaStoreAPI.loadSync(ids)||{};
+      Object.entries(got).forEach(([id,url])=>{ _mediaById.set(id,url); _mediaIdByUrl.set(url,id); _mediaPersisted.add(id); });
+      const missing=ids.filter(id=>!got[id]);
+      if(missing.length) console.warn('자동 저장 미디어 '+missing.length+'개를 찾지 못했습니다.');
+      // 지금 프로젝트가 쓰지 않는 오래된 미디어 파일 정리
+      window.mediaStoreAPI.gc(ids);
+      reviver=_mediaReviver;
+    }else if(window.mediaStoreAPI){
+      window.mediaStoreAPI.gc([]);
+    }
+    const data=JSON.parse(raw,reviver);
     if(!data || !Array.isArray(data.groups) || !Array.isArray(data.slides)) return false;
 
     groups=data.groups.map(g=>({...g}));
@@ -3417,6 +3578,17 @@ function resetBgPosition(){
   if(typeof toast==='function') toast('이미지 위치 초기화 ✓');
 }
 
+// 미리보기 프레임 높이 캐시.
+//   offsetHeight를 읽으면 방금 바뀐 화면 전체(예: 새로 그린 슬라이드 목록 1000줄)의 배치를
+//   그 자리에서 강제로 계산하게 되어 수백 ms가 걸린다. 크기는 ResizeObserver(snapFrame)에서만 바뀌므로 캐시한다.
+let _frameHCache=0;
+function _frameHeight(frame){
+  if(_frameHCache>20) return _frameHCache;
+  const h=frame?frame.offsetHeight:0;
+  if(h>20){ _frameHCache=h; return h; }
+  return 540;
+}
+
 function fillL(L, sl){
   const g=getGrp(sl.groupId);
   const layerEl=document.getElementById('L'+L);
@@ -3432,7 +3604,7 @@ function fillL(L, sl){
 
   // 에디터 프리뷰 크기에 맞게 폰트 스케일 (PPT 시각 비율 보존)
   const frame=document.getElementById('frame');
-  const frameH=(frame&&frame.offsetHeight>20)?frame.offsetHeight:540;
+  const frameH=_frameHeight(frame);
   const editorScale=frameH/(1080/1.4);
   // 반올림하지 않는다: 0.5px 차이만 나도 줄바꿈 위치가 송출 화면과 달라질 수 있음
   const displayFs=Math.max(6*editorScale,fs*editorScale);
@@ -3521,16 +3693,17 @@ function fillL(L, sl){
     medEl.classList.remove('bg-sel'); _bgSelCont=null; _bgSelSlideId=null;
   }
 
-  const wantSrc=sl.mediaURL||'';
+  const _gv=groupVideoSpecOf(sl);
+  const wantSrc=_gv?'':(sl.mediaURL||'');
   const wantOffX=sl.mediaOffX??50;
   const wantOffY=sl.mediaOffY??50;
   const wantScale=sl.mediaScale??100;
   const wantFit=sl.mediaFit||'cover';
-  const cacheKey=`${wantSrc}|${wantOffX}|${wantOffY}|${wantScale}|${wantFit}|${sl.mediaLoop!==false}|${sl.mediaAutoPlay!==false}`;
+  const cacheKey=`${wantSrc}|${wantOffX}|${wantOffY}|${wantScale}|${wantFit}|${sl.mediaLoop!==false}|${sl.mediaAutoPlay!==false}|${sl.mediaLoopMode||'normal'}|${sl.mediaLoopFade??1}`;
   if(medEl.dataset.cacheKey!==cacheKey){
     medEl.dataset.cacheKey=cacheKey;
     while(medEl.firstChild) medEl.removeChild(medEl.firstChild);
-    if(sl.mediaURL){
+    if(wantSrc){
       const applyBgStyle=(el)=>{
         el.style.cssText=`position:absolute;width:${wantScale}%;height:${wantScale}%;left:${wantOffX}%;top:${wantOffY}%;transform:translate(-50%,-50%);object-fit:${wantFit};max-width:none;max-height:none;display:block;cursor:move;`;
       };
@@ -3558,6 +3731,8 @@ function fillL(L, sl){
           });
         }
         applyBgStyle(v); medEl.appendChild(v);
+        if(window.VideoLoop) VideoLoop.attach(v,{loop:sl.mediaLoop!==false, mode:sl.mediaLoopMode, fade:sl.mediaLoopFade,
+          isFollower:()=>_isPreviewFollowingOut(v)});
       }
     }
   } else if(L===showL && sl.mediaURL && sl.mediaType==='image'){
@@ -3567,6 +3742,40 @@ function fillL(L, sl){
   }
 }
 
+// ──────────── GROUP BACKGROUND VIDEO ────────────
+/**
+ * 슬라이드가 그룹 배경 영상을 그대로 쓰고 있으면 이어서 재생할 공용 영상 정보를, 아니면 null.
+ * 배경 위치·크기나 소리·반복 설정을 따로 바꾼 슬라이드는 자기 영상을 쓴다.
+ */
+function groupVideoSpecOf(s){
+  const g=s?getGrp(s.groupId):null;
+  const bg=g&&g.bg;
+  if(!bg||bg.mediaType!=='video'||!bg.mediaURL) return null;
+  if(s.mediaType!=='video'||!slideBgMatchesGroup(s,bg)) return null;
+  if((s.mediaAudioEnabled===true)!==(bg.mediaAudioEnabled===true)
+    ||(s.mediaLoop!==false)!==(bg.mediaLoop!==false)
+    ||(s.mediaLoopMode||'normal')!==(bg.mediaLoopMode||'normal')
+    ||(s.mediaAutoPlay!==false)!==(bg.mediaAutoPlay!==false)) return null;
+  return {
+    key:_getMediaId(bg.mediaURL), url:bg.mediaURL, fit:bg.mediaFit||'cover',
+    audio:bg.mediaAudioEnabled===true, loop:bg.mediaLoop!==false,
+    loopMode:bg.mediaLoopMode||'normal', loopFade:bg.mediaLoopFade??1,
+    autoPlay:bg.mediaAutoPlay!==false
+  };
+}
+
+let _gbgPreview=null;
+function _updatePreviewGroupBg(sl, fd){
+  if(!window.GroupBgLayer) return;
+  const el=document.getElementById('GBG');
+  if(!el) return;
+  if(!_gbgPreview) _gbgPreview=GroupBgLayer.create(el,{isFollower:v=>_isPreviewFollowingOut(v)});
+  const spec=sl?groupVideoSpecOf(sl):null;
+  // 편집 미리보기는 항상 음소거 (소리는 송출 화면에서만)
+  if(spec) _gbgPreview.show({...spec,audio:false}, fd);
+  else _gbgPreview.hide(fd);
+}
+
 // ──────────── SHOW SLIDE ────────────
 function showSlide(sl, fade){
   if(!sl) return;
@@ -3574,11 +3783,13 @@ function showSlide(sl, fade){
   const slideFd = (sl.fadeSecs!=null) ? sl.fadeSecs : getFade();
   if(!fade || slideFd===0){
     fillL(showL, sl);
+    _updatePreviewGroupBg(sl, 0);
     _syncActiveLayer();
     return;
   }
   const nextL = showL==='A'?'B':'A';
   fillL(nextL, sl);
+  _updatePreviewGroupBg(sl, slideFd);
   const cur=document.getElementById('L'+showL);
   const nxt=document.getElementById('L'+nextL);
   // per-slide 페이드 시간을 CSS 변수에 반영
@@ -3614,7 +3825,7 @@ function showSlide(sl, fade){
 //   renderRP()    : 오른쪽 속성 패널
 
 /** 사이드바·미리보기·속성 패널을 모두 다시 그리고 프로젝트를 자동 저장 */
-function renderAll(fade=false){saveProject();renderSB();renderSlide(fade);renderRP();}
+function renderAll(fade=false){saveProject();renderSlide(fade);renderSB();renderRP();}
 
 function renderSlide(fade=false){
   const f=getFlat();
@@ -3624,6 +3835,7 @@ function renderSlide(fade=false){
   const activeGroupSlides=activeGroupId ? slides.filter(s=>s.groupId===activeGroupId) : [];
 
   if(activeGroup && !activeGroupSlides.length){
+  _updatePreviewGroupBg(null,0);
   document.getElementById('emptyEl').style.display='flex';
   document.getElementById('emptyEl').innerHTML='<div class="ei">📁</div><p>'+activeGroup.name+' 그룹에 슬라이드가 없습니다</p>';
   document.getElementById('posEl').innerHTML='<strong>0</strong>/0&nbsp;&nbsp;<span style="color:var(--text-muted)">'+activeGroup.name+'</span>';
@@ -3634,6 +3846,7 @@ function renderSlide(fade=false){
 }
 
   if(!f.length||curIdx<0){
+    _updatePreviewGroupBg(null,0);
     updateSlideEditBar();
     return;
   }
@@ -3641,6 +3854,7 @@ function renderSlide(fade=false){
   document.getElementById('emptyEl').innerHTML='<div class="ei">🎵</div><p>그룹과 슬라이드를 추가해보세요</p>';
   curIdx=Math.max(0,Math.min(curIdx,f.length-1));
   const sl=f[curIdx];
+  syncScreen();
   showSlide(sl,fade);
   const g=getGrp(sl.groupId);
   const{s,e}=effLoop();
@@ -3663,7 +3877,6 @@ function renderSlide(fade=false){
   setTimeout(()=>{ scrollCurSlideIntoView(); },40);
   updateSlideEditBar();
   updateFrameHead();
-  syncScreen();
   _syncMarkerLine();
   _updatePreviewVidBar();
 }
@@ -3840,7 +4053,7 @@ function renderSB(){
     const blk=document.createElement('div');blk.className='gb';
     // 그룹이 닫혀 있어도 현재 슬라이드가 들어 있으면 헤더를 빨갛게 강조한다.
     const isCurGroupClosed=(g.id===curGroupId)&&!g.open;
-    const hdr=document.createElement('div');hdr.className='gh'+(isCurGroupClosed?' cur':'');
+    const hdr=document.createElement('div');hdr.className='gh'+(isCurGroupClosed?' cur':'');hdr.dataset.gid=g.id;
     hdr.innerHTML='<div class="gbar" style="background:'+g.color+'"></div>'
       +'<div class="gname">'+g.name+'</div>'
       +'<div class="gcnt">'+gs.length+'</div>'
@@ -3913,10 +4126,10 @@ function renderSB(){
       if(g.loopSel) cls+=' gl';
       else if(gi===loopStart) cls+=' ls';
       else if(gi===loopEnd) cls+=' le';
-      const t=document.createElement('div');t.className=cls;
+      const t=document.createElement('div');t.className=cls;t.dataset.sid=s.id;
       const bgStyle=s.bgColor?'background:'+s.bgColor+';':'';
       const _pvTxt=getSlidePreviewText(s);
-      const pv=s.mediaURL?(s.mediaType==='image'?'<img src="'+s.mediaURL+'">':`<span style="font-size:16px;opacity:.4;">🎬</span>`)
+      const pv=s.mediaURL?(s.mediaType==='image'?'<img src="'+_thumbSrc(s.mediaURL)+'" decoding="async">':`<span style="font-size:16px;opacity:.4;">🎬</span>`)
         :'<div class="stiny" style="color:'+g.color+';text-shadow:0 1px 3px rgba(0,0,0,.9)">'+_pvTxt.split('\n').slice(0,3).join('\n')+'</div>';
       const slideLabel=getSlideDisplayName(s);
       t.innerHTML='<div class="snum">'+(li+1)+'</div>'
@@ -3949,7 +4162,7 @@ function renderSB(){
             setActiveGroup(targetGroup.id,false);
             stopAuto();
             renderSlide(true);
-            renderSB();
+            renderSBCur();
             renderRP();
           },250);
         }
@@ -3959,7 +4172,7 @@ function renderSB(){
           // Ctrl+클릭: 선택 토글 (이동 없음)
           if(_selectedIds.has(s.id)) _selectedIds.delete(s.id)
           else { _selectedIds.add(s.id); _lastSelId=s.id; }
-          renderSB()
+          renderSBCur()
         } else if(e.shiftKey && _lastSelId){
           // Shift+클릭: 범위 선택
           const _f=getFlat()
@@ -3967,7 +4180,7 @@ function renderSB(){
           const b=gi
           const [lo,hi]=a<=b?[a,b]:[b,a]
           _f.slice(lo,hi+1).forEach(x=>_selectedIds.add(x.id))
-          renderSB()
+          renderSBCur()
         } else {
           // 일반 클릭: 선택 초기화 후 이 슬라이드만 선택 + 이동
           _selectedIds.clear()
@@ -3977,7 +4190,7 @@ function renderSB(){
           setActiveGroup(g.id,false)
           stopAuto()
           renderSlide(true)
-          renderSB()
+          renderSBCur()
           renderRP()
         }
       });
@@ -4028,6 +4241,57 @@ function renderSB(){
     blk.appendChild(hdr);blk.appendChild(sd);list.appendChild(blk);
   }
   renderGloop();
+}
+
+/**
+ * 사이드바 썸네일용 이미지 주소. 큰 data URL은 한 번만 blob URL로 바꿔 재사용한다.
+ * (슬라이드 1000장의 목록을 다시 그릴 때 수백 MB의 HTML 문자열을 만들고 해석하는 일을 막는다)
+ */
+const _thumbUrlCache=new Map();
+function _thumbSrc(u){
+  if(typeof u!=='string' || !u.startsWith('data:') || u.length<4096) return u;
+  let b=_thumbUrlCache.get(u);
+  if(!b){
+    try{
+      const comma=u.indexOf(',');
+      const mime=u.slice(5,u.indexOf(';'))||'image/jpeg';
+      const bin=atob(u.slice(comma+1));
+      const arr=new Uint8Array(bin.length);
+      for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+      b=URL.createObjectURL(new Blob([arr],{type:mime}));
+    }catch(e){ b=u; }
+    _thumbUrlCache.set(u,b);
+  }
+  return b;
+}
+
+/**
+ * 슬라이드 이동·선택만 바뀌었을 때 쓰는 가벼운 사이드바 갱신.
+ * 목록 전체를 다시 만들지 않고(썸네일·이벤트 재생성 없음) 현재/선택/반복 표시 클래스만 바꾼다.
+ * 목록 구조가 달라졌으면(슬라이드 추가·삭제 등) renderSB()로 전체를 다시 그린다.
+ */
+function renderSBCur(){
+  const list=document.getElementById('sbList');
+  if(!list){ renderSB(); return; }
+  const f=getFlat();
+  const items=list.querySelectorAll('.st[data-sid]');
+  if(items.length!==f.length){ renderSB(); return; }
+  const idxOf=new Map(f.map((x,i)=>[x.id,i]));
+  for(const t of items){
+    const gi=idxOf.get(t.dataset.sid);
+    if(gi===undefined){ renderSB(); return; }
+    const g=getGrp(f[gi].groupId);
+    t.classList.toggle('cur',gi===curIdx);
+    t.classList.toggle('sel',_selectedIds.has(t.dataset.sid));
+    t.classList.toggle('gl',!!(g&&g.loopSel));
+    t.classList.toggle('ls',!(g&&g.loopSel)&&gi===loopStart);
+    t.classList.toggle('le',!(g&&g.loopSel)&&gi!==loopStart&&gi===loopEnd);
+  }
+  const curGroupId=(curIdx>=0&&f[curIdx])?f[curIdx].groupId:null;
+  list.querySelectorAll('.gh[data-gid]').forEach(h=>{
+    const g=getGrp(h.dataset.gid);
+    h.classList.toggle('cur',!!g&&g.id===curGroupId&&!g.open);
+  });
 }
 
 function renderRP(){
@@ -4133,9 +4397,8 @@ function next(fromAuto=false){
   }
 
   renderSlide(true);
-  renderSB();
+  renderSBCur();
   renderRP();
-  scrollCurSlideIntoView();
 
   if(autoOn) restartP();
 }
@@ -4189,9 +4452,8 @@ function prev(fromAuto=false){
   }
 
   renderSlide(true);
-  renderSB();
+  renderSBCur();
   renderRP();
-  scrollCurSlideIntoView();
 
   if(autoOn) restartP();
 }
@@ -4617,6 +4879,8 @@ function buildScreenSlideFields(s){
     mType:s.mediaType,
     mAudioEnabled:s.mediaAudioEnabled===true,
     mLoop:s.mediaLoop!==false,
+    mLoopMode:s.mediaLoopMode||'normal',
+    mLoopFade:s.mediaLoopFade??1,
     mAutoPlay:s.mediaAutoPlay!==false,
     mOffX:s.mediaOffX??50,
     mOffY:s.mediaOffY??50,
@@ -4666,6 +4930,7 @@ function syncScreen(){
   if(activeGroupId && s.groupId!==activeGroupId) return;
 
   const g=getGrp(s.groupId);
+  const gv=groupVideoSpecOf(s);
 
   // 다음 슬라이드도 전체 기준이 아니라 현재 그룹 기준으로 찾기
   const groupIndexes=getGroupIndexes(s.groupId);
@@ -4677,8 +4942,9 @@ function syncScreen(){
     ...buildScreenSlideFields(s),
     gn:g?.name,
     gc:g?.color,
-    mId:(()=>{ const id=_getMediaId(s.mediaURL); return id||undefined; })(),
+    mId:(()=>{ if(gv) return undefined; const id=_getMediaId(s.mediaURL); return id||undefined; })(),
     mURL:(()=>{
+      if(gv) return null;                       // 그룹 영상은 아래 gbg로 전송
       const id=_getMediaId(s.mediaURL);
       if(!id) return s.mediaURL||null;          // 미디어 없음
       if(_screenSentMedia.has(id)) return null; // 이미 전송 → ID만으로 충분
@@ -4688,6 +4954,7 @@ function syncScreen(){
     nxt:nxt?getSlidePreviewText(nxt):null,
     nxtMedia:(()=>{
       if(!nxt||nxt.mediaType!=='video') return null;
+      if(gv&&groupVideoSpecOf(nxt)?.key===gv.key) return null; // 같은 그룹 영상은 이어서 재생되므로 미리 불러올 필요 없음
       const id=_getMediaId(nxt.mediaURL);
       return {
         mId:id||undefined,
@@ -4700,6 +4967,8 @@ function syncScreen(){
         mType:nxt.mediaType,
         mAudioEnabled:nxt.mediaAudioEnabled===true,
         mLoop:nxt.mediaLoop!==false,
+        mLoopMode:nxt.mediaLoopMode||'normal',
+        mLoopFade:nxt.mediaLoopFade??1,
         mAutoPlay:nxt.mediaAutoPlay!==false,
         mOffX:nxt.mediaOffX??50,
         mOffY:nxt.mediaOffY??50,
@@ -4709,6 +4978,13 @@ function syncScreen(){
     })(),
     fd:(s.fadeSecs!=null?s.fadeSecs:getFade())
   };
+  if(gv){
+    // 슬라이드 레이어에는 영상을 만들지 않고, 송출 화면의 그룹 영상 레이어가 이어서 재생한다
+    payload.mType=null;
+    const sent=_screenSentMedia.has(gv.key);
+    if(!sent) _screenSentMedia.add(gv.key);
+    payload.gbg={...gv, url:sent?null:gv.url};
+  }
 
   try{
     if(typeof window.electronAPI.sendSlide === 'function'){
@@ -4780,6 +5056,7 @@ function normalizeGroupForFile(group){
       id:group.id,
       name:group.name||'공유 그룹',
       color:group.color||COLORS[0],
+      bg:group.bg||null,
       open:true,
       loopSel:false
     },
@@ -5302,6 +5579,7 @@ function importGroupFile(event){
         id:newGroupId,
         name:newName,
         color:rawGroup.color||COLORS[groups.length%COLORS.length],
+        bg:rawGroup.bg||null,
         open:true,
         loopSel:false
       };
@@ -5338,7 +5616,141 @@ function importGroupFile(event){
   reader.readAsText(file,'utf-8');
 }
 
+// ── 그룹 배경 ──
+// group.bg = { kind:'color'|'preset'|'media', label, colorId, presetId, bgColor, chromaKey,
+//              mediaURL, mediaType, mediaFit, mediaAudioEnabled, mediaLoop, mediaAutoPlay } | null(지정 안 함)
+// 그룹 배경은 그룹 안 슬라이드의 배경 필드로 복사된다. 배경을 바꿀 때 배경이 비어 있는(검정) 슬라이드와
+// 이전 그룹 배경을 그대로 쓰던 슬라이드는 바로 바뀌고, 따로 배경을 넣은 슬라이드는 바꿀지 물어본다.
+const GROUP_BG_COLORS=[
+  {id:'black', label:'검정', bgColor:'#000000'},
+  {id:'white', label:'흰색', bgColor:'#ffffff'},
+  {id:'green', label:'크로마키', bgColor:'#00b140', chromaKey:true},
+  {id:'blue',  label:'블루키', bgColor:'#0000ff', chromaKey:true},
+];
+const GROUP_BG_PRESETS=[
+  {id:'night', label:'밤하늘'},
+  {id:'rays',  label:'빛줄기'},
+  {id:'bokeh', label:'따스한 빛'},
+];
+const _groupBgPresetCache={}, _groupBgThumbCache={};
+
+function _seededRand(seed){
+  let s=(seed>>>0)||1;
+  return ()=>{ s=(Math.imul(s,1664525)+1013904223)>>>0; return s/4294967296; };
+}
+
+/** 기본 제공 배경을 캔버스에 그린다. 크기에 비례해 그리므로 썸네일과 원본이 같은 모양이 된다. */
+function _drawGroupBgPreset(ctx,w,h,id){
+  const k=w/1920;
+  const lin=(stops,x0=0,y0=0,x1=0,y1=h)=>{const g=ctx.createLinearGradient(x0,y0,x1,y1);stops.forEach(([o,c])=>g.addColorStop(o,c));return g;};
+  const rad=(cx,cy,r,stops)=>{const g=ctx.createRadialGradient(cx,cy,0,cx,cy,r);stops.forEach(([o,c])=>g.addColorStop(o,c));return g;};
+  const fill=f=>{ctx.fillStyle=f;ctx.fillRect(0,0,w,h);};
+  const vignette=a=>fill(rad(w/2,h/2,Math.hypot(w,h)/2,[[.5,'rgba(0,0,0,0)'],[1,'rgba(0,0,0,'+a+')']]));
+  const rnd=_seededRand([...id].reduce((a,c)=>(a*31+c.charCodeAt(0))>>>0,7));
+  const dot=(x,y,r,f)=>{ctx.fillStyle=f;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();};
+  switch(id){
+    case 'night':
+      fill(lin([[0,'#03040d'],[.6,'#0b1430'],[1,'#1b2550']]));
+      fill(rad(w*.5,h*1.1,h*.9,[[0,'rgba(80,110,200,.35)'],[1,'rgba(80,110,200,0)']]));
+      for(let i=0;i<260;i++){
+        const x=rnd()*w, y=rnd()*h*.85, r=Math.max(.5,(rnd()*1.4+.4)*k);
+        dot(x,y,r,'rgba(255,255,255,'+(.3+rnd()*.7).toFixed(2)+')');
+      }
+      break;
+    case 'rays': {
+      fill(lin([[0,'#1a1a2e'],[1,'#05050a']]));
+      const ox=w*.5, oy=-h*.15, len=h*1.5;
+      ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.filter='blur('+Math.max(1,14*k)+'px)';
+      for(let i=0;i<9;i++){
+        const a=-.56+i*.14+(rnd()-.5)*.05, sp=.035+rnd()*.03;
+        ctx.beginPath(); ctx.moveTo(ox,oy);
+        ctx.lineTo(ox+Math.sin(a-sp)*len, oy+Math.cos(a-sp)*len);
+        ctx.lineTo(ox+Math.sin(a+sp)*len, oy+Math.cos(a+sp)*len);
+        ctx.closePath();
+        ctx.fillStyle=lin([[0,'rgba(255,240,200,'+(.12+rnd()*.1).toFixed(2)+')'],[1,'rgba(255,240,200,0)']],ox,oy,ox,h);
+        ctx.fill();
+      }
+      ctx.restore();
+      fill(rad(ox,-h*.1,h*.5,[[0,'rgba(255,245,215,.5)'],[1,'rgba(255,245,215,0)']]));
+      vignette(.5); break;
+    }
+    case 'bokeh':
+      fill(lin([[0,'#1c1006'],[1,'#3d240c']],0,0,w,h));
+      ctx.save(); ctx.globalCompositeOperation='lighter';
+      for(let i=0;i<46;i++){
+        const x=rnd()*w, y=rnd()*h, r=(20+rnd()*90)*k, gr=(180+rnd()*50)|0;
+        dot(x,y,r,rad(x,y,r,[[0,'rgba(255,'+gr+',90,'+(.10+rnd()*.18).toFixed(2)+')'],[.8,'rgba(255,190,90,'+(.05+rnd()*.08).toFixed(2)+')'],[1,'rgba(255,190,90,0)']]));
+      }
+      ctx.restore(); vignette(.6); break;
+  }
+}
+
+/** 기본 제공 배경 이미지(data URL). 같은 문자열을 재사용하도록 캐시한다. */
+function getGroupBgPresetURL(id, thumb=false){
+  const cache=thumb?_groupBgThumbCache:_groupBgPresetCache;
+  if(cache[id]) return cache[id];
+  const w=thumb?192:1920, h=thumb?108:1080;
+  const c=document.createElement('canvas'); c.width=w; c.height=h;
+  _drawGroupBgPreset(c.getContext('2d'),w,h,id);
+  return cache[id]=c.toDataURL('image/jpeg',thumb?.8:.9);
+}
+
+function describeGroupBg(bg){
+  if(!bg) return '지정 안 함';
+  if(bg.label) return bg.label;
+  if(bg.kind==='media') return bg.mediaType==='video'?'영상':'사진';
+  return bg.bgColor||'배경';
+}
+
+/** 슬라이드 배경이 그룹 배경과 같은지 (위치·크기를 옮겼다면 다른 것으로 본다) */
+function slideBgMatchesGroup(s,bg){
+  if(!s||!bg) return false;
+  return (s.mediaURL||null)===(bg.mediaURL||null)
+    && (s.bgColor||null)===(bg.bgColor||null)
+    && parseFloat(s.mediaOffX??50)===50 && parseFloat(s.mediaOffY??50)===50
+    && parseFloat(s.mediaScale??100)===100;
+}
+
+/** 아무 배경도 없는(기본 검정) 슬라이드인지 */
+function slideBgIsEmpty(s){
+  return !s.mediaURL && (!s.bgColor || String(s.bgColor).toLowerCase()==='#000000');
+}
+
+function applyGroupBgToSlide(s,bg){
+  if(!s||!bg) return;
+  s.mediaURL=bg.mediaURL||null;
+  s.mediaType=bg.mediaURL?(bg.mediaType||'image'):null;
+  s.mediaOffX=50; s.mediaOffY=50; s.mediaScale=100;
+  s.mediaFit=bg.mediaFit||'cover';
+  s.mediaAudioEnabled=bg.mediaAudioEnabled===true;
+  s.mediaLoop=bg.mediaLoop!==false; s.mediaLoopMode=bg.mediaLoopMode||'normal'; s.mediaLoopFade=bg.mediaLoopFade??1;
+  s.mediaAutoPlay=bg.mediaAutoPlay!==false;
+  s.bgColor=bg.bgColor||null;
+  s.chromaKey=bg.chromaKey===true;
+}
+
+/** 새로 만든 슬라이드에 그룹 배경을 입힌다. keepOwn이면 이미 배경을 고른 슬라이드는 건드리지 않는다. */
+function applyGroupBgToNewSlides(list, keepOwn=false){
+  (list||[]).forEach(s=>{
+    const g=getGrp(s.groupId);
+    if(!g||!g.bg) return;
+    if(keepOwn && (s.mediaURL||s.bgColor)) return;
+    applyGroupBgToSlide(s,g.bg);
+  });
+}
+
 // ──────────── GROUP MODAL ────────────
+let gmBg=null;          // 그룹 모달에서 고른 배경 (null = 지정 안 함)
+let gmBgLoading=false;  // 사진/영상 파일을 읽는 중
+let _bgLib=[];          // 배경 라이브러리: 예전에 넣었던 사진·영상 [{id,name,type,thumb,url}]
+
+async function refreshBgLib(){
+  if(!window.bgLibraryAPI) return _bgLib=[];
+  try{ const list=await window.bgLibraryAPI.list(); _bgLib=Array.isArray(list)?list:[]; }
+  catch(e){ console.warn('배경 라이브러리 불러오기 실패:',e); }
+  return _bgLib;
+}
+
 function openGM(editId=null){
   editGid=editId;
   document.getElementById('GMtitle').textContent=editId?'그룹 편집':'그룹 추가';
@@ -5351,34 +5763,381 @@ function openGM(editId=null){
     co.appendChild(d);
   });
   document.getElementById('GMname').value=ex?ex.name:'';
+  gmBg=ex&&ex.bg?{...ex.bg}:null;
+  gmBgLoading=false;
+  document.getElementById('GMbgFile').value='';
+  _initGMBgDragDrop();
+  closeGMBgMenu();
+  renderGMBg();
+  refreshBgLib().then(()=>renderGMBg());
   openM('GM');
   setTimeout(()=>{ const n=document.getElementById('GMname'); if(n){n.focus();if(ex)n.select();} }, 80);
 }
+
+function _gmBgKey(bg){
+  if(!bg) return 'none';
+  if(bg.kind==='color') return 'color:'+bg.colorId;
+  if(bg.kind==='preset') return 'preset:'+bg.presetId;
+  if(bg.libId&&_bgLib.some(it=>it.id===bg.libId)) return 'lib:'+bg.libId;
+  return 'media';
+}
+
+/** 드롭다운 항목 목록 */
+function _gmBgOptions(){
+  const opts=[{key:'none',label:'지정 안 함',thumb:{none:true}}];
+  GROUP_BG_COLORS.forEach(c=>opts.push({key:'color:'+c.id,label:c.label,thumb:{color:c.bgColor},
+    pick:()=>({kind:'color',colorId:c.id,label:c.label,bgColor:c.bgColor,chromaKey:c.chromaKey===true,mediaURL:null,mediaType:null})}));
+  const custom=gmBg&&gmBg.kind==='color'&&gmBg.colorId==='custom';
+  opts.push({key:'color:custom',label:'직접 색상…',thumb:{color:custom?gmBg.bgColor:null,rainbow:!custom},
+    action:()=>document.getElementById('GMbgColor').click()});
+  opts.push({sep:true});
+  GROUP_BG_PRESETS.forEach(p=>opts.push({key:'preset:'+p.id,label:p.label,thumb:{image:getGroupBgPresetURL(p.id,true)},
+    pick:()=>({kind:'preset',presetId:p.id,label:p.label,bgColor:null,chromaKey:false,
+      mediaURL:getGroupBgPresetURL(p.id),mediaType:'image',mediaFit:'cover'})}));
+  opts.push({sep:true});
+  if(_bgLib.length){
+    opts.push({head:'내 배경 (예전에 넣은 사진·영상)'});
+    _bgLib.forEach(it=>opts.push({key:'lib:'+it.id,label:it.name||(it.type==='video'?'영상':'사진'),
+      thumb:it.type==='video'?{video:it.url}:{image:it.thumb||it.url},
+      action:()=>pickGMBgLibItem(it), del:()=>deleteBgLibItem(it)}));
+    opts.push({sep:true});
+  }
+  if(gmBg&&gmBg.kind==='media'&&_gmBgKey(gmBg)==='media'){
+    opts.push({key:'media',label:describeGroupBg(gmBg),
+      thumb:gmBg.mediaType==='video'?{video:gmBg.mediaURL}:{image:gmBg.mediaURL}});
+  }
+  opts.push({key:'upload',label:'사진·영상 파일 선택…',thumb:{plus:true},
+    action:()=>{ if(!gmBgLoading) document.getElementById('GMbgFile').click(); }});
+  return opts;
+}
+
+function _gmBgThumbEl(t){
+  const d=document.createElement('div');
+  d.className='gmBgThumb'+(t.none?' none':'');
+  if(t.color) d.style.background=t.color;
+  if(t.rainbow) d.style.background='conic-gradient(#f87171,#fbbf24,#34d399,#60a5fa,#a78bfa,#f87171)';
+  if(t.image) d.style.backgroundImage='url("'+t.image+'")';
+  if(t.video){ const v=document.createElement('video'); v.src=t.video; v.muted=true; v.preload='metadata'; d.appendChild(v); }
+  if(t.plus){ d.style.cssText+='background:var(--surface2);border-style:dashed;display:flex;align-items:center;justify-content:center;color:var(--text-dim);font-size:15px;'; d.textContent='＋'; }
+  return d;
+}
+
+function renderGMBg(){
+  const key=_gmBgKey(gmBg);
+  const opts=_gmBgOptions();
+  const cur=opts.find(o=>o.key===key)||opts[0];
+
+  // 드롭다운 버튼: 현재 배경 썸네일 + 이름
+  const btn=document.getElementById('GMbgBtn');
+  btn.innerHTML='';
+  btn.appendChild(_gmBgThumbEl(cur.thumb));
+  const lb=document.createElement('span'); lb.textContent=key==='color:custom'?'직접 색상 ('+gmBg.bgColor+')':cur.label.replace(/…$/,''); btn.appendChild(lb);
+  const ar=document.createElement('span'); ar.className='arw'; ar.textContent='▼'; btn.appendChild(ar);
+
+  // 큰 미리보기
+  const pv=document.getElementById('GMbgPreview');
+  pv.querySelectorAll('video').forEach(v=>{ if(window.VideoLoop) VideoLoop.detach(v); v.remove(); });
+  pv.classList.toggle('none',!gmBg);
+  pv.classList.toggle('loading',gmBgLoading);
+  pv.style.backgroundColor=gmBg&&gmBg.bgColor?gmBg.bgColor:'';
+  pv.style.backgroundImage=gmBg&&gmBg.mediaURL&&gmBg.mediaType!=='video'?'url("'+gmBg.mediaURL+'")':'';
+  if(gmBg&&gmBg.mediaURL&&gmBg.mediaType==='video'){
+    const v=document.createElement('video'); v.src=gmBg.mediaURL; v.muted=true; v.autoplay=true; v.playsInline=true;
+    pv.insertBefore(v,pv.firstChild);
+  }
+  const txt=pv.querySelector('.pvTxt');
+  txt.textContent=gmBg?'가사 미리보기':'배경 없음 · 슬라이드별 배경 유지';
+  txt.style.marginBottom=gmBg?'':'20px';
+  txt.style.color=gmBg&&gmBg.bgColor&&gmBg.bgColor.toLowerCase()==='#ffffff'?'#222':'#fff';
+  txt.style.fontSize=gmBg?'':'14px';
+  document.getElementById('GMbgPvHint').textContent=gmBgLoading?'파일을 불러오는 중…':'놓으면 바로 그룹 배경으로 적용됩니다';
+
+  const isVideo=gmBg&&gmBg.kind==='media'&&gmBg.mediaType==='video';
+  document.getElementById('GMbgVideoOpts').style.display=isVideo?'flex':'none';
+  if(isVideo){
+    document.getElementById('GMbgAudio').checked=gmBg.mediaAudioEnabled===true;
+    document.getElementById('GMbgLoop').checked=gmBg.mediaLoop!==false;
+    const mSel=document.getElementById('GMbgLoopMode');
+    mSel.value=gmBg.mediaLoopMode||'normal'; mSel.disabled=gmBg.mediaLoop===false;
+    const fSel=document.getElementById('GMbgLoopFade');
+    fSel.value=String(gmBg.mediaLoopFade??1);
+    fSel.style.display=(gmBg.mediaLoop!==false&&gmBg.mediaLoopMode==='crossfade')?'':'none';
+    const pvV=document.querySelector('#GMbgPreview video');
+    if(pvV&&window.VideoLoop) VideoLoop.attach(pvV,{loop:gmBg.mediaLoop!==false,mode:gmBg.mediaLoopMode,fade:gmBg.mediaLoopFade});
+  }
+  document.getElementById('GMbgInfo').textContent=gmBg
+    ? '그룹 안 슬라이드와 새로 추가하는 슬라이드에 적용됩니다.'
+    : '목록에서 배경을 고르거나, 내 사진·영상 파일을 미리보기로 끌어다 놓으세요.';
+}
+
+function toggleGMBgMenu(e){
+  e&&e.stopPropagation();
+  const menu=document.getElementById('GMbgMenu');
+  if(menu.style.display==='block'){ closeGMBgMenu(); return; }
+  const key=_gmBgKey(gmBg);
+  menu.innerHTML='';
+  _gmBgOptions().forEach(o=>{
+    if(o.sep){ const s=document.createElement('div'); s.className='gmBgSep'; menu.appendChild(s); return; }
+    if(o.head){ const h=document.createElement('div'); h.className='gmBgHead'; h.textContent=o.head; menu.appendChild(h); return; }
+    const it=document.createElement('div');
+    it.className='gmBgItem'+(o.key===key?' on':'');
+    it.appendChild(_gmBgThumbEl(o.thumb));
+    const lb=document.createElement('span'); lb.textContent=o.label; it.appendChild(lb);
+    if(o.key===key){ const c=document.createElement('span'); c.className='chk'; c.textContent='✓'; it.appendChild(c); }
+    if(o.del){
+      const d=document.createElement('span'); d.className='del'; d.textContent='✕'; d.title='라이브러리에서 삭제';
+      d.onclick=ev=>{ ev.stopPropagation(); o.del(); };
+      it.appendChild(d);
+    }
+    it.onclick=()=>{
+      closeGMBgMenu();
+      if(o.action){ o.action(); return; }
+      if(o.key==='none') gmBg=null;
+      else if(o.pick) gmBg=o.pick();
+      renderGMBg();
+    };
+    menu.appendChild(it);
+  });
+  const btn=document.getElementById('GMbgBtn');
+  const r=btn.getBoundingClientRect();
+  menu.style.left=r.left+'px';
+  menu.style.width=r.width+'px';
+  menu.style.maxHeight='';
+  menu.style.display='block';
+  const mh=menu.offsetHeight;
+  const below=window.innerHeight-r.bottom-12, above=r.top-12;
+  if(below>=mh||below>=above){ menu.style.top=(r.bottom+4)+'px'; menu.style.maxHeight=below+'px'; }
+  else{ const h=Math.min(mh,above); menu.style.top=(r.top-h-4)+'px'; menu.style.maxHeight=h+'px'; }
+  btn.classList.add('open');
+}
+
+function closeGMBgMenu(){
+  const menu=document.getElementById('GMbgMenu');
+  if(menu) menu.style.display='none';
+  document.getElementById('GMbgBtn')?.classList.remove('open');
+}
+
+let _gmBgDnDReady=false;
+/** 그룹 창에 사진·영상 파일을 끌어다 놓으면 배경으로 추가한다 (한 번만 연결) */
+function _initGMBgDragDrop(){
+  if(_gmBgDnDReady) return;
+  _gmBgDnDReady=true;
+  const gm=document.getElementById('GM');
+  const pv=document.getElementById('GMbgPreview');
+  let depth=0;
+  const hasFile=e=>[...(e.dataTransfer?.types||[])].includes('Files');
+  gm.addEventListener('dragenter',e=>{ if(!hasFile(e)) return; e.preventDefault(); depth++; pv.classList.add('dragover'); });
+  gm.addEventListener('dragover',e=>{ if(!hasFile(e)) return; e.preventDefault(); e.dataTransfer.dropEffect='copy'; });
+  gm.addEventListener('dragleave',e=>{ if(!hasFile(e)) return; depth=Math.max(0,depth-1); if(!depth) pv.classList.remove('dragover'); });
+  gm.addEventListener('drop',e=>{
+    if(!hasFile(e)) return;
+    e.preventDefault(); depth=0; pv.classList.remove('dragover');
+    const file=[...e.dataTransfer.files].find(f=>/^(image|video)\//.test(f.type));
+    if(!file){ toast('사진 또는 영상 파일만 넣을 수 있습니다'); return; }
+    loadGMBgFile(file);
+  });
+  document.addEventListener('mousedown',e=>{
+    const menu=document.getElementById('GMbgMenu');
+    if(menu.style.display!=='block') return;
+    if(menu.contains(e.target)||document.getElementById('GMbgBtn').contains(e.target)) return;
+    closeGMBgMenu();
+  });
+  document.querySelector('#GM .mbox')?.addEventListener('scroll',closeGMBgMenu);
+  window.addEventListener('resize',closeGMBgMenu);
+}
+
+function pickGMBgColor(color){
+  gmBg={kind:'color',colorId:'custom',label:'직접 색상',bgColor:color,chromaKey:false,mediaURL:null,mediaType:null};
+  renderGMBg();
+}
+
+/** 사진: 슬라이드 배경과 같은 방식으로 1920×1080 이내로 줄여 data URL로 만든다 */
+function _readGroupBgImage(file){
+  return new Promise((resolve,reject)=>{
+    const objectUrl=URL.createObjectURL(file);
+    const img=new Image();
+    img.onload=()=>{
+      URL.revokeObjectURL(objectUrl);
+      let w=img.naturalWidth, h=img.naturalHeight;
+      if(w>1920||h>1080){ const r=Math.min(1920/w,1080/h); w=Math.round(w*r); h=Math.round(h*r); }
+      const c=document.createElement('canvas'); c.width=w; c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      const keepPng=(file.type==='image/png'||file.type==='image/gif');
+      resolve(c.toDataURL(keepPng?'image/png':'image/jpeg', keepPng?1:0.88));
+    };
+    img.onerror=()=>{ URL.revokeObjectURL(objectUrl); reject(new Error('이미지를 읽을 수 없습니다.')); };
+    img.src=objectUrl;
+  });
+}
+
+/** 영상: 슬라이드 배경과 같이 임시파일(file://)로 저장하고, 안 되면 data URL로 읽는다 */
+async function _readGroupBgVideo(file){
+  if(window.electronAPI && typeof window.electronAPI.saveTempMedia==='function'){
+    try{
+      const ext=(file.name.split('.').pop()||'mp4').toLowerCase();
+      const res=await window.electronAPI.saveTempMedia({data:await file.arrayBuffer(), ext});
+      if(res&&res.ok&&res.url) return res.url;
+      throw new Error(res&&res.message||'임시파일 저장 실패');
+    }catch(err){ console.error('영상 임시파일 저장 실패, data URL로 대체:',err); }
+  }
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(reader.result);
+    reader.onerror=()=>reject(new Error('영상을 읽을 수 없습니다.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function pickGMBgFile(e){
+  const file=e.target.files[0];
+  e.target.value='';
+  if(file) loadGMBgFile(file);
+}
+
+async function loadGMBgFile(file){
+  if(gmBgLoading) return;
+  const isVideo=file.type.startsWith('video');
+  gmBgLoading=true; renderGMBg();
+  try{
+    let url=null, libId=null;
+    if(isVideo){
+      // 라이브러리에 저장한 뒤 그 사본을 쓴다 (영상 파일을 두 번 쓰지 않도록)
+      const lib=await _addBgLib({name:file.name,type:'video',ext:(file.name.split('.').pop()||'mp4').toLowerCase(),data:await file.arrayBuffer()});
+      if(lib){
+        const res=await window.bgLibraryAPI.use(lib.id).catch(()=>null);
+        if(res&&res.ok&&res.url){ url=res.url; libId=lib.id; }
+      }
+      if(!url) url=await _readGroupBgVideo(file);
+    }else{
+      url=await _readGroupBgImage(file);
+      const lib=await _addBgLib({name:file.name,type:'image',data:url,thumb:await _makeBgThumb(url).catch(()=>null)});
+      if(lib) libId=lib.id;
+    }
+    gmBg={kind:'media',label:file.name,bgColor:null,chromaKey:false,mediaURL:url,libId,
+      mediaType:isVideo?'video':'image',mediaFit:'cover',
+      mediaAudioEnabled:false,mediaLoop:true,mediaAutoPlay:true,mediaLoopMode:'normal',mediaLoopFade:1};
+    toast(libId?'배경 파일 불러오기 완료 ✓ 내 배경에 저장됨':'배경 파일 불러오기 완료 ✓');
+  }catch(err){
+    alert('배경 파일을 읽는 중 오류가 발생했습니다.\n'+(err?.message||err));
+  }finally{
+    gmBgLoading=false; renderGMBg();
+  }
+}
+
+/** 배경 라이브러리에 추가하고 목록을 갱신한다. 실패하면 null (배경 적용은 그대로 진행) */
+async function _addBgLib(payload){
+  if(!window.bgLibraryAPI) return null;
+  try{
+    const res=await window.bgLibraryAPI.add(payload);
+    if(!res||!res.ok){ console.warn('배경 라이브러리 저장 실패:',res&&res.message); return null; }
+    await refreshBgLib();
+    return res.item;
+  }catch(e){ console.warn('배경 라이브러리 저장 실패:',e); return null; }
+}
+
+/** 메뉴용 작은 썸네일 (192×108, 가운데 맞춰 자르기) */
+function _makeBgThumb(url){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    img.onload=()=>{
+      const w=192,h=108,c=document.createElement('canvas'); c.width=w; c.height=h;
+      const r=Math.max(w/img.naturalWidth,h/img.naturalHeight);
+      const dw=img.naturalWidth*r, dh=img.naturalHeight*r;
+      c.getContext('2d').drawImage(img,(w-dw)/2,(h-dh)/2,dw,dh);
+      resolve(c.toDataURL('image/jpeg',.8));
+    };
+    img.onerror=reject;
+    img.src=url;
+  });
+}
+
+/** 내 배경 목록에서 고른 사진·영상을 그룹 배경으로 */
+async function pickGMBgLibItem(it){
+  if(gmBgLoading||!window.bgLibraryAPI) return;
+  gmBgLoading=true; renderGMBg();
+  try{
+    const res=await window.bgLibraryAPI.use(it.id);
+    if(!res||!res.ok||!res.url) throw new Error(res&&res.message||'배경을 불러올 수 없습니다.');
+    const isVideo=it.type==='video';
+    gmBg={kind:'media',label:it.name,bgColor:null,chromaKey:false,mediaURL:res.url,libId:it.id,
+      mediaType:isVideo?'video':'image',mediaFit:'cover',
+      mediaAudioEnabled:false,mediaLoop:true,mediaAutoPlay:true,mediaLoopMode:'normal',mediaLoopFade:1};
+  }catch(err){
+    alert('배경을 불러오는 중 오류가 발생했습니다.\n'+(err?.message||err));
+    await refreshBgLib();
+  }finally{
+    gmBgLoading=false; renderGMBg();
+  }
+}
+
+/** 내 배경 목록에서 삭제 (이미 그 배경을 쓰는 그룹·슬라이드는 그대로 남는다) */
+async function deleteBgLibItem(it){
+  if(!confirm('"'+(it.name||'배경')+'"을(를) 내 배경 목록에서 삭제할까요?\n이미 이 배경을 쓰고 있는 그룹·슬라이드는 그대로 유지됩니다.')) return;
+  try{ await window.bgLibraryAPI.remove(it.id); }catch(e){ console.warn('배경 라이브러리 삭제 실패:',e); }
+  await refreshBgLib();
+  if(gmBg&&gmBg.libId===it.id) delete gmBg.libId;
+  renderGMBg();
+  closeGMBgMenu();
+  toggleGMBgMenu();
+  toast('내 배경에서 삭제됨');
+}
+
 function editGrp(id){openGM(id);}
 function saveGrp(){
   const name=document.getElementById('GMname').value.trim();
   if(!name)return;
+  if(gmBgLoading){ toast('배경 파일을 불러오는 중입니다. 잠시 후 다시 눌러 주세요'); return; }
+  closeGMBgMenu();
+  const bg=gmBg?{...gmBg}:null;
 
-  if(editGid){
-    const g=getGrp(editGid);
-    if(g){
-      g.name=name;
-      g.color=pgColor;
-    }
-  }else{
-    const newGroup={
-      id:mkId(),
-      name,
-      color:pgColor,
-      open:true,
-      loopSel:false
-    };
-
+  if(!editGid){
+    const newGroup={ id:mkId(), name, color:pgColor, bg, open:true, loopSel:false };
     groups.push(newGroup);
     activeGroupId=newGroup.id;
+    _finishGrpSave();
+    return;
   }
 
+  const g=getGrp(editGid);
+  if(!g){ _finishGrpSave(); return; }
+  const bgChanged=JSON.stringify(g.bg||null)!==JSON.stringify(bg);
+  if(!bg||!bgChanged){
+    g.name=name; g.color=pgColor; g.bg=bg;
+    _finishGrpSave();
+    return;
+  }
+
+  // 배경이 비어 있거나 이전 그룹 배경을 쓰던 슬라이드는 바로 바꾸고, 따로 배경을 넣은 슬라이드는 물어본다
+  const oldBg=g.bg||null;
+  const auto=[], own=[];
+  slides.forEach(s=>{
+    if(s.groupId!==g.id||slideBgMatchesGroup(s,bg)) return;
+    if(slideBgIsEmpty(s)||(oldBg&&slideBgMatchesGroup(s,oldBg))) auto.push(s);
+    else own.push(s);
+  });
+  const commit=list=>{
+    _pushUndo();
+    list.forEach(s=>applyGroupBgToSlide(s,bg));
+    g.name=name; g.color=pgColor; g.bg=bg;
+    if(list.length) toast('그룹 배경 적용 ✓ '+list.length+'장');
+    _finishGrpSave();
+  };
+  if(!own.length){ commit(auto); return; }
+
+  document.getElementById('GBGASKmsg').innerHTML=
+    '이 그룹에 이미 배경이 들어간 슬라이드가 <b>'+own.length+'장</b> 있습니다.<br>이 슬라이드들도 "'+escapeHtmlGM(describeGroupBg(bg))+'" 배경으로 모두 바꿀까요?';
+  document.getElementById('GBGASKall').onclick=()=>{ closeM('GBGASK'); commit([...auto,...own]); };
+  document.getElementById('GBGASKkeep').onclick=()=>{ closeM('GBGASK'); commit(auto); };
+  openM('GBGASK');
+}
+
+function escapeHtmlGM(t){
+  return String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function _finishGrpSave(){
   editGid=null;
+  gmBg=null;
   repairDuplicateIds();
   closeM('GM');
   renderAll();
@@ -5888,17 +6647,6 @@ function doSaveLayout(name){
     textShadowIntensity:s.textShadowIntensity??80,
     textOutlineEnabled:s.textOutlineEnabled===true,
     textOutlineWidth:s.textOutlineWidth||2,
-    mediaURL:s.mediaURL||null,
-    mediaType:s.mediaType||null,
-    mediaOffX:s.mediaOffX??50,
-    mediaOffY:s.mediaOffY??50,
-    mediaScale:s.mediaScale??100,
-    mediaFit:s.mediaFit||'cover',
-    mediaAudioEnabled:s.mediaAudioEnabled===true,
-    mediaLoop:s.mediaLoop!==false,
-    mediaAutoPlay:s.mediaAutoPlay!==false,
-    bgColor:s.bgColor||null,
-    chromaKey:s.chromaKey===true,
     textBoxes:stripLayoutTextBoxText(s.textBoxes||[])
   });
 
@@ -5957,17 +6705,7 @@ function quickApplyLayout(name){
     s.textShadowIntensity=layout.textShadowIntensity;
     s.textOutlineEnabled=layout.textOutlineEnabled;
     s.textOutlineWidth=layout.textOutlineWidth;
-    s.mediaURL=layout.mediaURL||null;
-    s.mediaType=layout.mediaURL?(layout.mediaType||'image'):null;
-    s.mediaOffX=layout.mediaOffX??50;
-    s.mediaOffY=layout.mediaOffY??50;
-    s.mediaScale=layout.mediaScale??100;
-    s.mediaFit=layout.mediaFit||'cover';
-    s.mediaAudioEnabled=layout.mediaAudioEnabled===true;
-    s.mediaLoop=layout.mediaLoop!==false;
-    s.mediaAutoPlay=layout.mediaAutoPlay!==false;
-    s.bgColor=layout.bgColor||null;
-    s.chromaKey=layout.chromaKey===true;
+    // 배경은 레이아웃에 포함되지 않으므로 슬라이드의 기존 배경을 그대로 둔다
     if(Array.isArray(layout.textBoxes)&&layout.textBoxes.length){
       s.textBoxes=mergeLayoutTextBoxes(s.textBoxes||[], normalizeTextBoxes(layout.textBoxes));
     }
@@ -6843,15 +7581,6 @@ function quickLoadLayoutToCurrentSlide(){
       fontColor:rawLayout.fontColor||'#ffffff',
       fontFamily:rawLayout.fontFamily||'Noto Serif KR',
       fadeSecs:Number.isFinite(parseFloat(rawLayout.fadeSecs))?parseFloat(rawLayout.fadeSecs):null,
-      mediaURL:rawLayout.mediaURL||null,
-      mediaType:rawLayout.mediaType||null,
-      mediaOffX:Number.isFinite(parseFloat(rawLayout.mediaOffX))?parseFloat(rawLayout.mediaOffX):50,
-      mediaOffY:Number.isFinite(parseFloat(rawLayout.mediaOffY))?parseFloat(rawLayout.mediaOffY):50,
-      mediaScale:Number.isFinite(parseFloat(rawLayout.mediaScale))?parseFloat(rawLayout.mediaScale):100,
-      mediaFit:['cover','contain','fill'].includes(rawLayout.mediaFit)?rawLayout.mediaFit:'cover',
-      mediaAudioEnabled:rawLayout.mediaAudioEnabled===true,
-      mediaLoop:rawLayout.mediaLoop!==false,
-      mediaAutoPlay:rawLayout.mediaAutoPlay!==false,
       textBoxes:typeof normalizeTextBoxes==='function'
         ? normalizeTextBoxes(rawLayout.textBoxes)
         : (Array.isArray(rawLayout.textBoxes)?rawLayout.textBoxes:[])
@@ -6866,17 +7595,6 @@ function quickLoadLayoutToCurrentSlide(){
       currentSlide.fontColor=layout.fontColor;
       currentSlide.fontFamily=layout.fontFamily;
       currentSlide.fadeSecs=layout.fadeSecs;
-      currentSlide.mediaURL=layout.mediaURL;
-      currentSlide.mediaType=layout.mediaType;
-      currentSlide.mediaOffX=layout.mediaOffX;
-      currentSlide.mediaOffY=layout.mediaOffY;
-      currentSlide.mediaScale=layout.mediaScale;
-      currentSlide.mediaFit=layout.mediaFit;
-      currentSlide.mediaAudioEnabled=layout.mediaAudioEnabled;
-      currentSlide.mediaLoop=layout.mediaLoop;
-      currentSlide.mediaAutoPlay=layout.mediaAutoPlay;
-      currentSlide.bgColor=rawLayout.bgColor||null;
-      currentSlide.chromaKey=rawLayout.chromaKey===true;
       currentSlide.textBoxes=layout.textBoxes;
     });
 
@@ -6952,21 +7670,13 @@ function openSM(editId=null){try{
   pmFit=ex&&['cover','contain','fill'].includes(ex.mediaFit)?ex.mediaFit:'cover';
   pmAudioEnabled=ex?ex.mediaAudioEnabled===true:false;
   pmLoopEnabled=ex?(ex.mediaLoop!==false):true;
+  pmLoopMode=ex?(ex.mediaLoopMode||'normal'):'normal'; pmLoopFade=ex?(ex.mediaLoopFade??1):1;
   pmAutoPlay=ex?(ex.mediaAutoPlay!==false):true;
   pmBgColor=ex?ex.bgColor||null:null;
   pmIsChromaKey=ex?ex.chromaKey===true:false;
-  updateBgColorUI();
-  const pp=document.getElementById('upprev');
-  if(pmURL){
-    pp.style.display='flex';
-    pp.innerHTML=pmType==='image'?'<img src="'+pmURL+'"><span>기존 이미지</span>':'<video src="'+pmURL+'" style="width:80px;height:50px;object-fit:cover;border-radius:4px;"></video><span>기존 영상</span>';
-    document.getElementById('clearMed').style.display='block';
-  } else {
-    pp.style.display='none';pp.innerHTML='';document.getElementById('clearMed').style.display='none';
-  }
-  _showVideoSettingsBox(pmType==='video');
-  _syncVideoSettingsBtns();
-  document.getElementById('fileI').value='';
+  _refreshSMBgUI('기존');
+  sel.onchange=updateSMGroupBgRow;
+  updateSMGroupBgRow();
 
   if(typeof renderTextBoxEditors==='function'){
     renderTextBoxEditors();
@@ -6985,6 +7695,44 @@ openM('SM');
 }catch(e){console.error('openSM 오류:',e);alert('슬라이드 편집 창 오류: '+e.message);}
 
 }
+/** 슬라이드 모달의 배경 색상·미디어 미리보기를 현재 pm* 값에 맞춘다 */
+function _refreshSMBgUI(prefix){
+  updateBgColorUI();
+  const pp=document.getElementById('upprev');
+  if(pmURL){
+    pp.style.display='flex';
+    pp.innerHTML=pmType==='image'?'<img src="'+pmURL+'"><span>'+prefix+' 이미지</span>':'<video src="'+pmURL+'" style="width:80px;height:50px;object-fit:cover;border-radius:4px;"></video><span>'+prefix+' 영상</span>';
+    document.getElementById('clearMed').style.display='block';
+  } else {
+    pp.style.display='none';pp.innerHTML='';document.getElementById('clearMed').style.display='none';
+  }
+  _showVideoSettingsBox(pmType==='video');
+  _syncVideoSettingsBtns();
+  document.getElementById('fileI').value='';
+}
+/** 선택된 그룹에 그룹 배경이 있으면 "그룹 배경으로 되돌리기" 줄을 보여준다 */
+function updateSMGroupBgRow(){
+  const row=document.getElementById('SMgroupBgRow');
+  if(!row) return;
+  const g=getGrp(document.getElementById('SMgrp')?.value);
+  if(!g||!g.bg){ row.style.display='none'; return; }
+  row.style.display='flex';
+  document.getElementById('SMgroupBgText').textContent='그룹 배경: '+describeGroupBg(g.bg)
+    +(editSid?' · 여기서 바꾸면 이 슬라이드만 바뀝니다':'');
+}
+function useGroupBgInSM(){
+  const g=getGrp(document.getElementById('SMgrp')?.value);
+  if(!g||!g.bg) return;
+  const bg=g.bg;
+  pmURL=bg.mediaURL||null; pmType=pmURL?(bg.mediaType||'image'):null;
+  pmOffX=50; pmOffY=50; pmScale=100; pmFit=bg.mediaFit||'cover';
+  pmAudioEnabled=bg.mediaAudioEnabled===true; pmLoopEnabled=bg.mediaLoop!==false; pmAutoPlay=bg.mediaAutoPlay!==false;
+  pmLoopMode=bg.mediaLoopMode||'normal'; pmLoopFade=bg.mediaLoopFade??1;
+  pmBgColor=bg.bgColor||null; pmIsChromaKey=bg.chromaKey===true;
+  _refreshSMBgUI('그룹');
+  if(typeof updFP==='function') updFP();
+  toast('그룹 배경을 적용했습니다. 저장을 눌러 확정하세요');
+}
 function pickFile(e){
   const file=e.target.files[0];
   if(!file)return;
@@ -6992,7 +7740,7 @@ function pickFile(e){
   pmType=file.type.startsWith('video')?'video':'image';
   // 새 파일을 올리면 위치·크기는 기본값으로 초기화 (새 배경은 중앙·100%에서 시작)
   pmOffX=50; pmOffY=50; pmScale=100; pmFit='cover';
-  if(pmType==='video'){ pmAudioEnabled=false; pmLoopEnabled=true; pmAutoPlay=true; _syncVideoSettingsBtns(); _showVideoSettingsBox(true); }
+  if(pmType==='video'){ pmAudioEnabled=false; pmLoopEnabled=true; pmAutoPlay=true; pmLoopMode='normal'; pmLoopFade=1; _syncVideoSettingsBtns(); _showVideoSettingsBox(true); }
   else { _showVideoSettingsBox(false); }
 
   const pp=document.getElementById('upprev');
@@ -7100,6 +7848,10 @@ function _syncVideoSettingsBtns(){
   if(lBtn) lBtn.textContent=pmLoopEnabled?'반복 재생 🔁':'한번만 재생 ▶';
   const aSel=document.getElementById('videoAutoPlaySel');
   if(aSel) aSel.value=String(pmAutoPlay!==false);
+  const mSel=document.getElementById('videoLoopModeSel');
+  if(mSel){ mSel.value=pmLoopMode||'normal'; mSel.disabled=!pmLoopEnabled; }
+  const fSel=document.getElementById('videoLoopFadeSel');
+  if(fSel){ fSel.value=String(pmLoopFade??1); fSel.style.display=(pmLoopEnabled&&pmLoopMode==='crossfade')?'':'none'; }
 }
 // ── 미리보기 하단 영상 진행 바 ──
 let _prevBarRaf = null
@@ -7110,38 +7862,104 @@ function _fmtVT(s) {
 }
 
 function _getPreviewVid() {
+  if (_gbgPreview && _gbgPreview.active()) return _gbgPreview.video()
   const ml = document.getElementById('M' + showL)
   return ml ? ml.querySelector('video') : null
 }
 
 // ── 영상 싱크: 송출 영상(기준)을 편집 미리보기가 따라간다 ──
-// 송출 화면은 200ms마다 { mId, t, paused, at }를 보고한다.
-// 미리보기는 오차가 작으면 재생 속도를 살짝 조절해 부드럽게 맞추고(끊김 없음),
-// 오차가 크면(슬라이드 전환 직후·반복 재생 경계 등) 한 번에 위치를 맞춘다.
+// 송출 화면은 100ms마다(재생·정지·구간 이동 시엔 즉시) { mId, t, paused, dir, xf, at }를 보고한다.
+//   dir: -1이면 역재생 왕복 중 거꾸로 재생하는 구간
+//   xf : 페이드 반복으로 끝과 처음을 겹치는 중이면 { t, p } — 미리보기도 똑같이 겹친다
+// 미리보기는 오차가 작으면 재생 속도를 조절해 부드럽게 맞추고(끊김 없음),
+// 오차가 크면(슬라이드 전환 직후·반복 경계 등) 한 번에 위치를 맞춘다. 이때 탐색에 걸리는 시간만큼 앞당겨 맞춘다.
 // 송출 영상은 절대 건드리지 않으므로 송출 화면에는 끊김이 생기지 않는다.
 let _vidSyncHoldUntil = 0   // 사용자가 직접 조작한 직후엔 잠시 싱크를 멈춤 (조작 결과가 송출에 반영될 때까지)
 let _vidSyncDragging = false
+let _vidSeekLag = 0.08      // 미리보기 영상의 탐색(seek) 소요 시간 추정치(초) — 실제 탐색 시간으로 계속 보정
+let _vidLastHardSeek = 0
 
 function _holdVidSync(ms) { _vidSyncHoldUntil = Date.now() + (ms || 800) }
 
+let _lastOutVidState = null
+/** 편집 미리보기 영상이 지금 송출 영상을 따라가는 중인지 (그렇다면 역재생은 송출 쪽을 따른다) */
+function _isPreviewFollowingOut(vid) {
+  const st = _lastOutVidState
+  return !!(screenOpen && st && Date.now() - st.recv < 1000 && _getMediaId(vid.getAttribute('src')) === st.mId)
+}
+
+/** 송출 영상의 '지금' 위치 (보고 시각 이후 흐른 시간만큼 진행 방향으로 앞당김) */
+function _outVidNow(st) {
+  if (st.paused && st.dir !== -1) return st.t
+  const el = Math.max(0, Date.now() - st.at) / 1000
+  return st.dir === -1 ? st.t - el : st.t + el
+}
+
+/** 탐색 시간을 재면서 위치 이동 (다음 탐색부터 그만큼 앞당겨 맞춘다) */
+function _seekPreviewVid(vid, t) {
+  const t0 = performance.now()
+  vid.addEventListener('seeked', () => {
+    const lag = (performance.now() - t0) / 1000
+    if (lag > 0 && lag < 1) _vidSeekLag = _vidSeekLag * 0.7 + lag * 0.3
+  }, { once: true })
+  vid.currentTime = t
+}
+
+// 송출이 거꾸로 재생하는 동안, 미리보기도 송출 위치를 따라 거꾸로 이동한다
+let _vidRevRaf = null
+function _followOutReverse(vid) {
+  vid.playbackRate = 1
+  if (!vid.paused) vid.pause()
+  if (_vidRevRaf) return
+  let seeking = false
+  const onSeeked = () => { seeking = false }
+  vid.addEventListener('seeked', onSeeked)
+  const step = () => {
+    const st = _lastOutVidState
+    if (!st || st.dir !== -1 || !screenOpen || _getPreviewVid() !== vid || Date.now() - st.recv > 1000) {
+      vid.removeEventListener('seeked', onSeeked)
+      _vidRevRaf = null
+      return
+    }
+    if (!seeking) {
+      seeking = true
+      vid.currentTime = Math.max(0, _outVidNow(st) - _vidSeekLag)
+    }
+    _vidRevRaf = requestAnimationFrame(step)
+  }
+  _vidRevRaf = requestAnimationFrame(step)
+}
+
 function _applyOutVideoState(st) {
+  if (st) _lastOutVidState = { ...st, recv: Date.now() }
   if (!st || !screenOpen) return
   if (_vidSyncDragging || Date.now() < _vidSyncHoldUntil) return
   const vid = _getPreviewVid()
   if (!vid || !vid.duration || vid.readyState < 1) return
   // 미리보기와 송출이 같은 영상일 때만 맞춘다
   if (_getMediaId(vid.getAttribute('src')) !== st.mId) return
+  if (window.VideoLoop) {
+    // 송출 화면이 페이드 반복으로 끝과 처음을 겹치는 중이면, 미리보기도 같은 위치·진행도로 겹친다
+    if (st.xf) {
+      VideoLoop.mirror(vid, { twinT: st.xf.t + Math.max(0, Date.now() - st.at) / 1000, p: st.xf.p }, _vidSeekLag)
+      return
+    }
+    if (VideoLoop.mirroring(vid)) VideoLoop.mirror(vid, null)
+    // 원래 영상으로 넘겨받는 중이면 끼어들지 않는다 (끝나면 다시 맞춘다)
+    if (VideoLoop.busy(vid)) return
+  }
+
+  if (st.dir === -1) { _followOutReverse(vid); return }
 
   const dur = vid.duration
   if (st.paused) {
     vid.playbackRate = 1
     if (!vid.paused) vid.pause()
-    if (Math.abs(vid.currentTime - st.t) > 0.05) vid.currentTime = st.t
+    if (Math.abs(vid.currentTime - st.t) > 0.05) _seekPreviewVid(vid, st.t)
     return
   }
 
-  // IPC 전달 지연만큼 앞당긴 송출 영상의 '지금' 위치
-  let target = st.t + Math.max(0, Date.now() - st.at) / 1000
+  let target = _outVidNow(st)
   if (vid.loop) target %= dur
   else target = Math.min(target, dur)
 
@@ -7152,13 +7970,19 @@ function _applyOutVideoState(st) {
     else if (diff < -dur / 2) diff += dur
   }
 
-  if (vid.paused || Math.abs(diff) > 0.5) {
+  const now = Date.now()
+  if (vid.paused || (Math.abs(diff) > 0.25 && now - _vidLastHardSeek > 600)) {
+    // 크게 어긋남: 탐색 시간만큼 앞당겨 한 번에 맞춘다 (연달아 탐색해 버벅이지 않도록 0.6초 간격)
+    _vidLastHardSeek = now
     vid.playbackRate = 1
-    vid.currentTime = target
+    let t = target + _vidSeekLag
+    if (vid.loop) t %= dur
+    else t = Math.min(t, dur)
+    _seekPreviewVid(vid, t)
     if (vid.paused) vid.play().catch(() => {})
-  } else if (Math.abs(diff) > 0.03) {
-    // 0.03초 이상 어긋나면 최대 ±15% 속도로 서서히 따라잡기
-    vid.playbackRate = 1 + Math.max(-0.15, Math.min(0.15, diff * 0.8))
+  } else if (Math.abs(diff) > 0.02) {
+    // 조금 어긋남: 최대 ±25% 속도로 빠르게 따라잡기 (0.1초 차이 ≈ 0.6초 안에 맞춰짐)
+    vid.playbackRate = 1 + Math.max(-0.25, Math.min(0.25, diff * 1.5))
   } else if (vid.playbackRate !== 1) {
     vid.playbackRate = 1
   }
@@ -7260,7 +8084,7 @@ function _updatePreviewVidBar() {
   }
 }
 
-function removeMed(){pmURL=null;pmType=null;pmOffX=50;pmOffY=50;pmScale=100;pmFit='cover';pmAudioEnabled=false;pmLoopEnabled=true;pmAutoPlay=true;document.getElementById('upprev').style.display='none';document.getElementById('upprev').innerHTML='';document.getElementById('clearMed').style.display='none';document.getElementById('fileI').value='';_showVideoSettingsBox(false);}
+function removeMed(){pmURL=null;pmType=null;pmOffX=50;pmOffY=50;pmScale=100;pmFit='cover';pmAudioEnabled=false;pmLoopEnabled=true;pmAutoPlay=true;pmLoopMode='normal';pmLoopFade=1;document.getElementById('upprev').style.display='none';document.getElementById('upprev').innerHTML='';document.getElementById('clearMed').style.display='none';document.getElementById('fileI').value='';_showVideoSettingsBox(false);}
 
 function updFP(){
   const sz=document.getElementById('SMsz').value||36;
@@ -7292,7 +8116,8 @@ function getNamedLayouts(){
   try{
     const raw=localStorage.getItem(NAMED_LAYOUTS_STORAGE_KEY);
     const data=raw?JSON.parse(raw):{};
-    return data && typeof data==='object' ? data : {};
+    // 예전에 배경까지 저장된 레이아웃도 배경 없이 읽는다
+    return data && typeof data==='object' ? stripLayoutsBackground(data) : {};
   }catch(e){
     console.warn('저장된 레이아웃 불러오기 실패:', e);
     return {};
@@ -7593,7 +8418,7 @@ function createBlankSlide(){
     mediaScale:L?.mediaScale ?? 100,
     mediaFit:  L?.mediaFit  || 'cover',
     mediaAudioEnabled: L?.mediaAudioEnabled === true,
-    mediaLoop: L?.mediaLoop !== false,
+    mediaLoop: L?.mediaLoop !== false, mediaLoopMode:L?.mediaLoopMode||'normal', mediaLoopFade:L?.mediaLoopFade??1,
     mediaAutoPlay: L?.mediaAutoPlay !== false,
     bgColor:   L?.bgColor   || null,
     chromaKey: L?.chromaKey === true,
@@ -7605,6 +8430,7 @@ function createBlankSlide(){
     textBoxes
   };
 
+  applyGroupBgToNewSlides([newSlide]);
   const _flat=getFlat();
   const _cur=_flat[curIdx];
   const _pos=_cur?slides.findIndex(s=>s.id===_cur.id):-1;
@@ -7746,7 +8572,7 @@ async function makeMultiLangSlides(){
         mediaURL:L?.mediaURL||null, mediaType:L?.mediaType||null,
         mediaOffX:L?.mediaOffX??50, mediaOffY:L?.mediaOffY??50,
         mediaScale:L?.mediaScale??100, mediaFit:L?.mediaFit||'cover',
-        mediaAudioEnabled:L?.mediaAudioEnabled===true, mediaLoop:L?.mediaLoop!==false, mediaAutoPlay:L?.mediaAutoPlay!==false,
+        mediaAudioEnabled:L?.mediaAudioEnabled===true, mediaLoop:L?.mediaLoop!==false, mediaLoopMode:L?.mediaLoopMode||'normal', mediaLoopFade:L?.mediaLoopFade??1, mediaAutoPlay:L?.mediaAutoPlay!==false,
         bgColor:L?.bgColor||null, chromaKey:L?.chromaKey===true,
         layoutType:L?.layoutType||'centerLyrics', layoutName,
         textX:krCfg.x, textY:krCfg.y,
@@ -7754,6 +8580,7 @@ async function makeMultiLangSlides(){
     }).filter(Boolean);
 
     if(!newSlides.length) throw new Error('생성된 슬라이드가 없습니다.');
+    applyGroupBgToNewSlides(newSlides);
     slides.push(...newSlides);
     setActiveGroup(gid,false);
     const firstIdx=getGlobalIndexBySlideId(newSlides[0].id);
@@ -7789,7 +8616,7 @@ function refreshLayoutNameDatalist(){
 
 function setNamedLayouts(data){
   try{
-    localStorage.setItem(NAMED_LAYOUTS_STORAGE_KEY, JSON.stringify(data));
+    localStorage.setItem(NAMED_LAYOUTS_STORAGE_KEY, JSON.stringify(stripLayoutsBackground(data)));
   }catch(e){
     console.warn('레이아웃 저장 실패:', e);
   }
@@ -7823,17 +8650,7 @@ function syncLayoutToSlides(name){
     s.textShadowIntensity=layout.textShadowIntensity;
     s.textOutlineEnabled=layout.textOutlineEnabled;
     s.textOutlineWidth=layout.textOutlineWidth;
-    s.mediaURL=layout.mediaURL||null;
-    s.mediaType=layout.mediaURL?(layout.mediaType||'image'):null;
-    s.mediaOffX=layout.mediaOffX??50;
-    s.mediaOffY=layout.mediaOffY??50;
-    s.mediaScale=layout.mediaScale??100;
-    s.mediaFit=layout.mediaFit||'cover';
-    s.mediaAudioEnabled=layout.mediaAudioEnabled===true;
-    s.mediaLoop=layout.mediaLoop!==false;
-    s.mediaAutoPlay=layout.mediaAutoPlay!==false;
-    s.bgColor=layout.bgColor||null;
-    s.chromaKey=layout.chromaKey===true;
+    // 배경은 레이아웃에 포함되지 않으므로 슬라이드의 기존 배경을 그대로 둔다
     if(Array.isArray(layout.textBoxes)&&layout.textBoxes.length){
       s.textBoxes=mergeLayoutTextBoxes(s.textBoxes||[], normalizeTextBoxes(layout.textBoxes));
     }
@@ -8435,6 +9252,26 @@ function stripLayoutTextBoxText(boxes){
   return boxes.map(b=>({...b, text:''}));
 }
 
+// 레이아웃에는 배경(이미지/영상/배경색/크로마키)을 저장하지 않는다 — 배경은 슬라이드/그룹 쪽에서 관리
+const _LAYOUT_BG_KEYS=[
+  'mediaURL','mediaType','mediaOffX','mediaOffY','mediaScale','mediaFit',
+  'mediaAudioEnabled','mediaLoop','mediaLoopMode','mediaLoopFade','mediaAutoPlay',
+  'bgColor','chromaKey'
+];
+function stripLayoutBackground(layout){
+  if(!layout || typeof layout!=='object') return layout;
+  const out={...layout};
+  _LAYOUT_BG_KEYS.forEach(k=>{ delete out[k]; });
+  return out;
+}
+function stripLayoutsBackground(data){
+  const out={};
+  if(data && typeof data==='object'){
+    Object.keys(data).forEach(name=>{ out[name]=stripLayoutBackground(data[name]); });
+  }
+  return out;
+}
+
 // 레이아웃의 textBox 서식을 슬라이드에 병합 — 텍스트 내용은 슬라이드 것 유지
 const _LAYOUT_TB_FORMAT_KEYS=[
   'x','y','width','height','fontSize','fontColor','fontFamily','align',
@@ -8485,7 +9322,7 @@ function normalizeLayout(layout={}){
     mediaScale:Number.isFinite(parseFloat(layout.mediaScale))?parseFloat(layout.mediaScale):100,
     mediaFit:['cover','contain','fill'].includes(layout.mediaFit)?layout.mediaFit:'cover',
     mediaAudioEnabled:layout.mediaAudioEnabled===true,
-    mediaLoop:layout.mediaLoop!==false,
+    mediaLoop:layout.mediaLoop!==false, mediaLoopMode:layout.mediaLoopMode||'normal', mediaLoopFade:layout.mediaLoopFade??1,
     mediaAutoPlay:layout.mediaAutoPlay!==false,
     bgColor:layout.bgColor||null,
     chromaKey:layout.chromaKey===true,
@@ -8529,6 +9366,8 @@ function getLayoutFromModal(){
     mediaFit:['cover','contain','fill'].includes(pmFit)?pmFit:'cover',
     mediaAudioEnabled:pmAudioEnabled===true,
     mediaLoop:pmLoopEnabled!==false,
+    mediaLoopMode:pmLoopMode,
+    mediaLoopFade:pmLoopFade,
     mediaAutoPlay:pmAutoPlay!==false,
     bgColor:pmBgColor||null,
     chromaKey:pmIsChromaKey===true,
@@ -8575,43 +9414,7 @@ function applyLayoutToModal(layout){
     setFadeCSS();
   }
 
-  pmURL=layout.mediaURL||null;
-  pmType=layout.mediaType||null;
-  pmOffX=Number.isFinite(parseFloat(layout.mediaOffX))?parseFloat(layout.mediaOffX):50;
-  pmOffY=Number.isFinite(parseFloat(layout.mediaOffY))?parseFloat(layout.mediaOffY):50;
-  pmScale=Number.isFinite(parseFloat(layout.mediaScale))?parseFloat(layout.mediaScale):100;
-  pmFit=['cover','contain','fill'].includes(layout.mediaFit)?layout.mediaFit:'cover';
-  pmAudioEnabled=layout.mediaAudioEnabled===true;
-  pmLoopEnabled=layout.mediaLoop!==false;
-  pmAutoPlay=layout.mediaAutoPlay!==false;
-  pmBgColor=layout.bgColor||null;
-  pmIsChromaKey=layout.chromaKey===true;
-  updateBgColorUI();
-
-  const pp=document.getElementById('upprev');
-  const clearBtn=document.getElementById('clearMed');
-
-  if(pmURL){
-    pp.style.display='flex';
-
-    if(pmType==='image'){
-      pp.innerHTML='<img src="'+pmURL+'"><span>저장된 이미지 배경</span>';
-    }else if(pmType==='video'){
-      pp.innerHTML='<video src="'+pmURL+'" style="width:80px;height:50px;object-fit:cover;border-radius:4px;"></video><span>저장된 영상 배경</span>';
-    }else{
-      pp.innerHTML='<span>저장된 배경</span>';
-    }
-
-    clearBtn.style.display='block';
-  }else{
-    pp.style.display='none';
-    pp.innerHTML='';
-    clearBtn.style.display='none';
-  }
-
-  _showVideoSettingsBox(pmType==='video');
-  _syncVideoSettingsBtns();
-  document.getElementById('fileI').value='';
+  // 배경(pmURL 등)은 레이아웃에 포함되지 않으므로 모달의 현재 배경을 그대로 둔다
 
 if(typeof renderTextBoxEditors === 'function'){
   renderTextBoxEditors();
@@ -8651,7 +9454,7 @@ function saveNamedLayoutFromModal(){
     : (Array.isArray(modalTextBoxes) ? modalTextBoxes : []);
 
   const layoutToSave={
-    ...getLayoutFromModal(),
+    ...stripLayoutBackground(getLayoutFromModal()),
     layoutName:name,
     textBoxes: stripLayoutTextBoxText(
       typeof normalizeTextBoxes === 'function'
@@ -8690,8 +9493,8 @@ function saveNamedLayoutFromModal(){
 
   toast(
     exists
-      ? (layoutToSave.mediaURL ? '레이아웃 + 배경 덮어쓰기 완료 ✓ ('+syncCount+'개 동기화)' : '레이아웃 덮어쓰기 완료 ✓ ('+syncCount+'개 동기화)')
-      : (layoutToSave.mediaURL ? '레이아웃 + 배경 저장 완료 ✓' : '레이아웃 저장 완료 ✓')
+      ? '레이아웃 덮어쓰기 완료 ✓ ('+syncCount+'개 동기화)'
+      : '레이아웃 저장 완료 ✓'
   );
 }
 function loadNamedLayoutToModal(){
@@ -8715,7 +9518,7 @@ function loadNamedLayoutToModal(){
   applyLayoutToModal({...layout,layoutName:name});
   applyModalLayoutToEditingSlidePreview();
 
-  toast(layout.mediaURL ? '레이아웃 + 배경 불러오기 완료 ✓ 저장을 눌러 확정하세요' : '레이아웃 불러오기 완료 ✓ 저장을 눌러 확정하세요');
+  toast('레이아웃 불러오기 완료 ✓ 저장을 눌러 확정하세요');
 }
 function applyModalLayoutToEditingSlidePreview(){
   if(!editSid) return;
@@ -8733,15 +9536,6 @@ function applyModalLayoutToEditingSlidePreview(){
   s.fontColor=layout.fontColor;
   s.fontFamily=layout.fontFamily;
   s.fadeSecs=layout.fadeSecs;
-  s.mediaURL=layout.mediaURL;
-  s.mediaType=layout.mediaType;
-  s.mediaOffX=layout.mediaOffX;
-  s.mediaOffY=layout.mediaOffY;
-  s.mediaScale=layout.mediaScale;
-  s.mediaFit=layout.mediaFit;
-  s.mediaAudioEnabled=layout.mediaAudioEnabled===true;
-  s.mediaLoop=layout.mediaLoop!==false;
-  s.mediaAutoPlay=layout.mediaAutoPlay!==false;
 
   showSlide(s,false);
   syncScreen();
@@ -8797,7 +9591,7 @@ function exportLayoutFile(){
     layout={...getLayoutFromModal(),layoutName:name};
   }
 
-  layout=normalizeLayout(layout);
+  layout=stripLayoutBackground(normalizeLayout(layout));
   layout.layoutName=name;
 
   const payload={
@@ -8878,7 +9672,7 @@ function importLayoutFile(event){
       document.getElementById('SMlayoutName').value=name;
       applyLayoutToModal(layout);
 
-      toast(layout.mediaURL ? '레이아웃 + 배경 파일 불러오기 완료 ✓' : '레이아웃 파일 불러오기 완료 ✓');
+      toast('레이아웃 파일 불러오기 완료 ✓');
     }catch(error){
       console.error(error);
       alert('레이아웃 파일을 불러오는 중 오류가 발생했습니다: '+error.message);
@@ -8904,9 +9698,6 @@ function copyCurrentLayoutToClipboard(){
     return;
   }
 
-  const currentMediaURL = pmURL || s.mediaURL || null;
-  const currentMediaType = pmType || s.mediaType || null;
-
   copiedLayout={
     layoutType:document.getElementById('SMlayout')?.value || s.layoutType || 'centerLyrics',
     textX:parseFloat(document.getElementById('SMtx')?.value) || s.textX || 50,
@@ -8914,16 +9705,7 @@ function copyCurrentLayoutToClipboard(){
     fontSize:parseInt(document.getElementById('SMsz')?.value) || s.fontSize || 36,
     fontColor:document.getElementById('SMcol')?.value || s.fontColor || '#ffffff',
     fontFamily:document.getElementById('SMfont')?.value || s.fontFamily || 'Noto Serif KR',
-    fadeSecs:s.fadeSecs??null,
-    mediaURL:currentMediaURL,
-    mediaType:currentMediaType,
-    mediaOffX:s.mediaOffX??50,
-    mediaOffY:s.mediaOffY??50,
-    mediaScale:s.mediaScale??100,
-    mediaFit:s.mediaFit||'cover',
-    mediaAudioEnabled:s.mediaAudioEnabled===true,
-    mediaLoop:s.mediaLoop!==false,
-    mediaAutoPlay:s.mediaAutoPlay!==false
+    fadeSecs:s.fadeSecs??null
   };
 
   try{
@@ -8932,7 +9714,7 @@ function copyCurrentLayoutToClipboard(){
     console.warn('복사한 레이아웃 임시 저장 실패:', e);
   }
 
-  toast(currentMediaURL ? '레이아웃 + 배경 복사 완료 ✓' : '레이아웃 복사 완료 ✓ 배경 없음');
+  toast('레이아웃 복사 완료 ✓');
 }
 
 function loadCopiedLayoutToModal(){
@@ -8957,38 +9739,7 @@ function loadCopiedLayoutToModal(){
   document.getElementById('SMsz').value=copiedLayout.fontSize||36;
   document.getElementById('SMcol').value=copiedLayout.fontColor||'#ffffff';
 
-  pmURL=copiedLayout.mediaURL||null;
-  pmType=copiedLayout.mediaType||null;
-  pmOffX=Number.isFinite(parseFloat(copiedLayout.mediaOffX))?parseFloat(copiedLayout.mediaOffX):50;
-  pmOffY=Number.isFinite(parseFloat(copiedLayout.mediaOffY))?parseFloat(copiedLayout.mediaOffY):50;
-  pmScale=Number.isFinite(parseFloat(copiedLayout.mediaScale))?parseFloat(copiedLayout.mediaScale):100;
-  pmFit=['cover','contain','fill'].includes(copiedLayout.mediaFit)?copiedLayout.mediaFit:'cover';
-  pmAudioEnabled=copiedLayout.mediaAudioEnabled===true;
-  pmLoopEnabled=copiedLayout.mediaLoop!==false;
-  pmAutoPlay=copiedLayout.mediaAutoPlay!==false;
-
-  const pp=document.getElementById('upprev');
-  const clearBtn=document.getElementById('clearMed');
-
-  if(pmURL){
-    pp.style.display='flex';
-
-    if(pmType==='image'){
-      pp.innerHTML='<img src="'+pmURL+'"><span>복사된 이미지 배경</span>';
-    }else if(pmType==='video'){
-      pp.innerHTML='<video src="'+pmURL+'" style="width:80px;height:50px;object-fit:cover;border-radius:4px;"></video><span>복사된 영상 배경</span>';
-    }else{
-      pp.innerHTML='<span>복사된 배경</span>';
-    }
-
-    clearBtn.style.display='block';
-  }else{
-    pp.style.display='none';
-    pp.innerHTML='';
-    clearBtn.style.display='none';
-  }
-
-  document.getElementById('fileI').value='';
+  // 배경은 복사/붙여넣기에 포함되지 않으므로 모달의 현재 배경을 그대로 둔다
 
   const fsel=document.getElementById('SMfont');
   const ff=copiedLayout.fontFamily||'Noto Serif KR';
@@ -9006,7 +9757,7 @@ function loadCopiedLayoutToModal(){
 
   refreshLayoutPresetSelect();
   updFP();
-  toast(pmURL ? '레이아웃 + 배경 불러오기 완료 ✓' : '레이아웃 불러오기 완료 ✓ 배경 없음');
+  toast('레이아웃 불러오기 완료 ✓');
 }
 /**
  * 슬라이드 편집 모달의 입력값을 저장한다.
@@ -9064,7 +9815,7 @@ function saveSlide(){
       s.mediaScale=modalLayout.mediaScale;
       s.mediaFit=modalLayout.mediaFit;
       s.mediaAudioEnabled=modalLayout.mediaAudioEnabled===true;
-      s.mediaLoop=modalLayout.mediaLoop!==false;
+      s.mediaLoop=modalLayout.mediaLoop!==false; s.mediaLoopMode=modalLayout.mediaLoopMode||'normal'; s.mediaLoopFade=modalLayout.mediaLoopFade??1;
       s.mediaAutoPlay=modalLayout.mediaAutoPlay!==false;
       s.bgColor=pmBgColor||null;
       s.chromaKey=pmIsChromaKey;
@@ -9098,11 +9849,14 @@ function saveSlide(){
   mediaScale:modalLayout.mediaScale,
   mediaFit:modalLayout.mediaFit,
   mediaAudioEnabled:modalLayout.mediaAudioEnabled===true,
-  mediaLoop:modalLayout.mediaLoop!==false,
+  mediaLoop:modalLayout.mediaLoop!==false, mediaLoopMode:modalLayout.mediaLoopMode||'normal', mediaLoopFade:modalLayout.mediaLoopFade??1,
   mediaAutoPlay:modalLayout.mediaAutoPlay!==false,
   bgColor:pmBgColor||null,
   chromaKey:pmIsChromaKey
 };
+  // 배경을 따로 고르지 않았으면 그룹 배경을 따른다
+  const _g=getGrp(gid);
+  if(_g&&_g.bg&&!pmURL&&!pmBgColor) applyGroupBgToSlide(newSlide,_g.bg);
   slides.push(newSlide);
     curIdx=getFlat().length-1;
   }
@@ -9164,6 +9918,11 @@ function normalizeSlideForFile(sl){
     mediaOffY:Number.isFinite(parseFloat(sl.mediaOffY))?parseFloat(sl.mediaOffY):50,
     mediaScale:Number.isFinite(parseFloat(sl.mediaScale))?parseFloat(sl.mediaScale):100,
     mediaFit:['cover','contain','fill'].includes(sl.mediaFit)?sl.mediaFit:'cover',
+    mediaAudioEnabled:sl.mediaAudioEnabled===true,
+    mediaLoop:sl.mediaLoop!==false, mediaLoopMode:sl.mediaLoopMode||'normal', mediaLoopFade:sl.mediaLoopFade??1,
+    mediaAutoPlay:sl.mediaAutoPlay!==false,
+    bgColor:sl.bgColor||null,
+    chromaKey:sl.chromaKey===true,
     textBoxes:typeof normalizeTextBoxes==='function' ? normalizeTextBoxes(sl.textBoxes) : (sl.textBoxes||[]),
     shapeBoxes:typeof normalizeShapeBoxes==='function' ? normalizeShapeBoxes(sl.shapeBoxes) : (sl.shapeBoxes||[])
   };
@@ -10676,6 +11435,7 @@ if(window.electronAPI && typeof window.electronAPI.onOutputControl === 'function
     raf = requestAnimationFrame(() => {
       raf = null;
       snapFrame();
+      _frameHCache = 0; // 크기가 바뀌었으니 다음 fillL에서 새로 잰다
       if(typeof renderSlide === 'function') renderSlide(false);
     });
   }).observe(wrapEl);
