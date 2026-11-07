@@ -111,6 +111,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
   onSecondScreenClosed: (cb) =>
     registerSingleListener("second-screen-closed", cb, () => undefined),
 
+  // 송출 화면 준비 완료: screen.html이 수신 준비를 마치면 알리고, 조작창은 지금 화면을 다시 보낸다
+  // (송출 창이 늦게 뜨면 열 때 보낸 첫 화면과 배경 주소를 놓치기 때문)
+  sendScreenReady: () => ipcRenderer.send("screen-ready"),
+  onScreenReady: (cb) =>
+    registerSingleListener("screen-ready", cb, () => undefined),
+
   // 슬라이드 데이터 수신 콜백 등록 (screen.html에서 사용)
   onSlideUpdate: (cb) =>
     registerSingleListener("slide-update", cb),
@@ -142,6 +148,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
   sendMarkerLine: (data) => ipcRenderer.send("marker-line", data),
   onMarkerLine: (cb) => registerSingleListener("marker-line", cb),
   removeMarkerLineListener: () => unregisterSingleListener("marker-line"),
+
+  // 배경 밝기: 편집 창의 배경 컨트롤 → 송출 화면 배경(사진·영상)에 반영
+  // v: 밝기(1 = 원래 밝기), dur: 바뀌는 시간(초, 없으면 바로)
+  sendBgBrightness: (v, dur) => ipcRenderer.send("bg-brightness", { v, dur }),
+  onBgBrightness: (cb) => registerSingleListener("bg-brightness", cb),
+  removeBgBrightnessListener: () => unregisterSingleListener("bg-brightness"),
 
   // 전체화면 상태 변경 알림 (true=진입, false=해제)
   onWindowFullscreenChange: (cb) => registerSingleListener("window-fullscreen-change", cb),

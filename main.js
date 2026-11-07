@@ -1555,6 +1555,15 @@ ipcMain.on("slide-update", (event, data) => {
   }
 });
 
+// 송출 화면이 수신 준비를 마쳤음을 조작창에 알린다 → 조작창이 지금 화면을 다시 보낸다
+// (PPT 캡처용 숨김 창도 screen.html을 쓰므로 송출 창에서 온 것만 전달)
+ipcMain.on("screen-ready", (event) => {
+  if (!secondWin || secondWin.isDestroyed() || event.sender !== secondWin.webContents) return;
+  if (mainWin && !mainWin.isDestroyed()) {
+    mainWin.webContents.send("screen-ready");
+  }
+});
+
 /**
  * IPC 핸들러: 블랙아웃(화면 암전)을 켜거나 끈다.
  * on=true이면 검은 오버레이로 화면 전체를 덮는다.
@@ -1605,6 +1614,20 @@ ipcMain.on("output-control", (event, action) => {
 ipcMain.on("marker-line", (event, data) => {
   if (secondWin && !secondWin.isDestroyed()) {
     secondWin.webContents.send("marker-line", data);
+  }
+});
+
+/**
+ * IPC 핸들러: 배경 컨트롤의 밝기 값을 송출 화면으로 전달한다.
+ * { v: 밝기(1 = 원래 밝기, 0~2), dur: 바뀌는 시간(초, 0~5) }. 송출 화면은 배경 사진·영상에만 적용한다.
+ */
+ipcMain.on("bg-brightness", (event, msg) => {
+  const m = (msg && typeof msg === "object") ? msg : { v: msg };
+  const v = Number(m.v);
+  const dur = Number(m.dur) || 0;
+  if (!Number.isFinite(v)) return;
+  if (secondWin && !secondWin.isDestroyed()) {
+    secondWin.webContents.send("bg-brightness", { v: Math.max(0, Math.min(2, v)), dur: Math.max(0, Math.min(5, dur)) });
   }
 });
 
@@ -4703,8 +4726,8 @@ ipcMain.handle("media:save-temp", async (event, payload) => {
 
 // ──────────────────────────────────────────────────────────
 // 배경 라이브러리 (preload의 bgLibraryAPI)
-//   그룹 배경으로 한 번 넣은 사진·영상을 userData/bg-library 에 보관해 두고
-//   다음에 그룹을 만들 때 목록에서 바로 고를 수 있게 한다.
+//   그룹·슬라이드 배경으로 한 번 넣은 사진·영상을 userData/bg-library 에 보관해 두고
+//   다음에 배경을 고를 때 목록에서 바로 고를 수 있게 한다.
 //   index.json : [{ id, name, type:'image'|'video', file, thumb, addedAt }]
 //   슬라이드/그룹은 라이브러리 파일을 직접 가리키지 않고 use 할 때 받은 사본을 쓴다
 //   → 라이브러리에서 지워도 이미 만든 그룹 배경은 그대로 남는다.

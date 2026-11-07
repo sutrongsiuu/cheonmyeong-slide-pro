@@ -6,7 +6,7 @@
  * 슬라이드를 넘겨도 영상은 처음부터 다시 틀지 않고, 위의 가사·텍스트만 바뀐다.
  *
  *  show(spec, fd) : 이 영상을 보여준다. 이미 같은 영상이면 그대로 이어서 재생한다.
- *                   다른 영상이면 fd초 동안 새 영상이 서서히 나타난다.
+ *                   다른 영상이면 새 영상의 첫 화면이 준비된 뒤 fd초 동안 서서히 나타난다.
  *  hide(fd)       : 따로 배경을 넣은 슬라이드로 넘어갈 때. fd초 동안 사라진 뒤 일시정지한다.
  *                   (다시 show 하면 멈춘 위치부터 이어서 재생)
  *
@@ -14,14 +14,24 @@
  *          '다음 슬라이드 레이어' 위에서 함께 페이드아웃되게 한다. (컨테이너는 LB 뒤에 위치해야 함)
  *
  * spec = { key, url, fit, audio, loop, loopMode, loopFade, autoPlay }
- * opts = { takeVideo(spec) → 미리 디코딩해 둔 <video>, isFollower(video), onAwaitPlay(video, spec) }
+ * opts = { takeVideo(spec) → 미리 디코딩해 둔 <video>, isFollower(video), onAwaitPlay(video, spec),
+ *          seamless: false 면 보통 반복은 브라우저 기본 반복 (편집 미리보기: 디코더를 아낀다) }
+ *
+ * 반복 재생은 VideoLoop의 이어달리기를 쓰므로 영상 하나가 <video> 두 개로 번갈아 재생될 수 있다.
+ * cur.video 는 그 영상을 대표하는 요소이고, 지금 재생 중인 요소는 act(cur.video)로 얻는다.
  */
 (function(){
+  /** 지금 보이며 재생 중인 요소 */
+  const act = v => (window.VideoLoop && v) ? VideoLoop.active(v) : v
+  /** 이 영상을 이루는 요소들 (이어달리기 쌍둥이 포함) */
+  const all = v => (window.VideoLoop && v) ? VideoLoop.elements(v) : (v ? [v] : [])
+
   function create(container, opts){
     opts = opts || {}
     let cur = null          // { key, video, spec, sig, started }
     let visible = false
     let hideTimer = null
+    let retiring = []       // 새 영상이 다 나타나면 지울 이전 영상들 (그동안 아래에서 계속 재생된다)
 
     container.style.opacity = '0'
     container.style.zIndex = '0'
@@ -30,17 +40,19 @@
 
     function startPlay(v, spec){
       // Chromium 자동재생 정책: 음소거로 먼저 재생한 뒤 소리 설정을 반영
+      v = act(v)
       v.muted = true
       v.play().then(() => { v.muted = !spec.audio }).catch(() => {})
     }
 
+    /** 반복 방식을 건다. 앞으로 이 영상을 대표할 요소를 돌려준다 */
     function attachLoop(v, spec){
       if (window.VideoLoop) {
-        VideoLoop.attach(v, { loop: spec.loop !== false, mode: spec.loopMode, fade: spec.loopFade,
-          isFollower: opts.isFollower ? () => opts.isFollower(v) : undefined })
-      } else {
-        v.loop = spec.loop !== false
+        return VideoLoop.attach(v, { loop: spec.loop !== false, mode: spec.loopMode, fade: spec.loopFade,
+          seamless: opts.seamless, isFollower: opts.isFollower ? () => opts.isFollower(act(v)) : undefined })
       }
+      v.loop = spec.loop !== false
+      return v
     }
 
     function makeVideo(spec){
@@ -55,9 +67,9 @@
 
     function removeVideo(v){
       if (!v) return
-      if (window.VideoLoop) VideoLoop.detach(v)
-      try { v.pause(); v.removeAttribute('src'); v.load() } catch (e) {}
-      v.remove()
+      // 이어달리기 쌍둥이까지 함께 내린다
+      const keep = window.VideoLoop ? VideoLoop.detach(v) : v
+      ;[v, keep].forEach(x => { if (!x) return; try { x.pause(); x.removeAttribute('src'); x.load() } catch (e) {} ; x.remove() })
     }
 
     function clearHide(){
@@ -77,20 +89,21 @@
 
       // 같은 영상: 그대로 이어서 재생
       if (cur && cur.key === spec.key) {
-        if (cur.sig !== sigOf(spec)) { attachLoop(cur.video, spec); cur.sig = sigOf(spec) }
+        if (cur.sig !== sigOf(spec)) { cur.video = attachLoop(cur.video, spec); cur.sig = sigOf(spec) }
         cur.spec = spec
-        cur.video.style.objectFit = spec.fit || 'cover'
-        if (cur.video.paused && !cur.video.ended && (spec.autoPlay !== false || cur.started)) startPlay(cur.video, spec)
-        else cur.video.muted = !spec.audio
-        return cur.video
+        all(cur.video).forEach(x => { x.style.objectFit = spec.fit || 'cover' })
+        const a = act(cur.video)
+        if (a.paused && !a.ended && (spec.autoPlay !== false || cur.started)) startPlay(a, spec)
+        else a.muted = !spec.audio
+        return a
       }
 
       // 새 영상
       const old = cur
-      const v = makeVideo(spec)
-      cur = { key: spec.key, video: v, spec, sig: sigOf(spec), started: false }
+      let v = makeVideo(spec)
       container.appendChild(v)
-      attachLoop(v, spec)
+      v = attachLoop(v, spec)
+      cur = { key: spec.key, video: v, spec, sig: sigOf(spec), started: false }
       if (spec.autoPlay !== false) {
         cur.started = true
         startPlay(v, spec)
@@ -101,16 +114,27 @@
       }
 
       if (old) {
-        old.video.muted = true
+        all(old.video).forEach(x => { x.muted = true })
         if (wasVisible && fd > 0) {
-          // 그룹이 바뀌어 다른 영상이 되면 새 영상이 위에서 서서히 나타난다
+          // 다른 영상으로 바뀌면 새 영상이 위에서 서서히 나타난다.
+          // 새 영상의 첫 화면이 준비된 뒤에 시작해야 중간에 툭 튀어나오지 않는다 (최대 0.7초 대기).
+          // 그동안 이전 영상은 아래에서 계속 재생되고, 새 영상이 다 나타나면 정리한다.
+          retiring.push(old.video)
           v.style.opacity = '0'
-          void v.offsetWidth
-          v.style.transition = 'opacity ' + fd + 's ease-in-out'
-          v.style.opacity = '1'
-          setTimeout(() => removeVideo(old.video), fd * 1000 + 50)
+          const ready = (window.VideoLoop && VideoLoop.whenFrame) ? VideoLoop.whenFrame(v, 700) : Promise.resolve()
+          ready.then(() => {
+            if (!cur || cur.video !== v) return   // 그 사이 또 다른 영상으로 바뀜 → 그쪽이 이어받아 정리한다
+            v.style.transition = 'opacity ' + fd + 's ease-in-out'
+            void v.offsetWidth
+            v.style.opacity = '1'
+            const olds = retiring
+            retiring = []
+            setTimeout(() => olds.forEach(removeVideo), fd * 1000 + 50)
+          })
         } else {
           removeVideo(old.video)
+          retiring.forEach(removeVideo)
+          retiring = []
         }
       }
       return v
@@ -127,7 +151,7 @@
         container.style.transition = 'none'
         container.style.opacity = '0'
         container.style.zIndex = '0'
-        if (v) { try { v.pause() } catch (e) {} }
+        if (v) { try { act(v).pause() } catch (e) {} }
       }
       if (fd > 0) {
         container.style.zIndex = '1'
@@ -146,7 +170,8 @@
       show,
       hide,
       active: () => visible && !!cur,
-      video: () => (visible && cur) ? cur.video : null,
+      /** 지금 보이며 재생 중인 요소 */
+      video: () => (visible && cur) ? act(cur.video) : null,
       key: () => cur ? cur.key : null
     }
   }

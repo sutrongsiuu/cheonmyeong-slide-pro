@@ -204,16 +204,35 @@ function computeTextShadowCSS(enabled, intensity, scale){
 // 송출은 1920×1080 무대에 배율 1.4로 그린 뒤 창 크기에 맞춰 통째로 축소/확대한다.
 // 그래서 모니터 해상도가 달라도 글자 크기·두께·줄바꿈 비율이 미리보기와 같다.
 // 16:9가 아닌 화면에서는 비율을 지키기 위해 위아래/좌우에 검은 여백이 생긴다.
+//
+// 무대의 위치·크기는 실제 화면 픽셀 경계에 딱 맞춘다.
+// 가장자리가 픽셀 중간에 걸리면 크로스페이드 동안 사라지는 레이어와 나타나는 레이어의 끝 한 줄이
+// 각자 반투명하게 겹쳐 그려져, 나타날 화면이 가장자리 한 줄에만 먼저 비쳐 보인다.
+// (예: 1920×1032 창이면 무대 폭이 1834.67px → 오른쪽 끝 열이 페이드 시작과 함께 바뀜)
+// 가로·세로를 각각 정수 픽셀로 맞추므로 비율 차이는 2px 이하라 눈에 띄지 않는다.
 const STAGE_W = 1920, STAGE_H = 1080, STAGE_K = 1.4
 function fitStage(){
   const st = document.getElementById('stage')
   if(!st) return
-  const W = window.innerWidth, H = window.innerHeight
-  const sc = Math.min(W / STAGE_W, H / STAGE_H)
-  const ox = (W - STAGE_W * sc) / 2, oy = (H - STAGE_H * sc) / 2
-  st.style.transform = `translate(${ox}px,${oy}px) scale(${sc})`
+  const dpr = window.devicePixelRatio || 1
+  const vv = window.visualViewport
+  const Wd = Math.round((vv ? vv.width : window.innerWidth) * dpr)   // 창 크기 (화면 픽셀)
+  const Hd = Math.round((vv ? vv.height : window.innerHeight) * dpr)
+  const sc = Math.min(Wd / STAGE_W, Hd / STAGE_H)
+  // 무대 크기 (정수 화면 픽셀). 창과 2px 이하로만 차이 나면 창에 꽉 채워 끝에 1px 검은 줄이 남지 않게 한다
+  let w = Math.round(STAGE_W * sc), h = Math.round(STAGE_H * sc)
+  if (Wd - w <= 2) w = Wd
+  if (Hd - h <= 2) h = Hd
+  const ox = Math.floor((Wd - w) / 2), oy = Math.floor((Hd - h) / 2)
+  st.style.transform = `translate(${ox / dpr}px,${oy / dpr}px) scale(${w / (STAGE_W * dpr)},${h / (STAGE_H * dpr)})`
 }
 window.addEventListener('resize', fitStage)
+// 배율이 다른 모니터로 옮겨지면 창의 CSS 크기가 같아도 화면 픽셀 경계가 달라진다
+;(function watchDpr(){
+  const mq = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`)
+  const onChange = () => { mq.removeEventListener('change', onChange); fitStage(); watchDpr() }
+  mq.addEventListener('change', onChange)
+})()
 fitStage()
 
 // 현재 표시 중인 레이어 ('A' 또는 'B')
@@ -221,6 +240,8 @@ let sL = 'A'
 
 // 진행 중인 페이드 애니메이션 목록 (새 슬라이드 전환 시 이전 애니메이션 취소용)
 let _fadeAnims = []
+// 진행 중인 전환(준비 대기 + 페이드)이 끝나는 예상 시각. 그 전에는 새 영상 워밍 같은 무거운 일을 미룬다
+let _transitionUntil = 0
 
 // 클릭 시 재생 모드일 때 등록된 핸들러 (슬라이드 전환 시 제거)
 let _clickToPlayHandler = null
@@ -262,12 +283,18 @@ function _makeWarmVideo(url){
   return v
 }
 
-/** 워밍 풀에 해당 mId의 따뜻한 요소가 없으면 백그라운드로 새로 채워 넣는다. */
+/**
+ * 워밍 풀에 해당 mId의 따뜻한 요소가 없으면 백그라운드로 새로 채워 넣는다.
+ * 화면 전환(페이드) 중에 새 영상을 디코딩하면 전환이 끊겨 보이므로 전환이 끝난 뒤에 만든다.
+ */
 function _scheduleRewarm(mId, url){
   if(!mId || !url || _warmPool[mId]) return
   const make = () => { if(!_warmPool[mId]) _warmPool[mId] = _makeWarmVideo(url) }
-  if(window.requestIdleCallback) requestIdleCallback(make, {timeout:1500})
-  else setTimeout(make, 200)
+  const wait = Math.max(200, _transitionUntil - performance.now() + 300)
+  setTimeout(() => {
+    if(window.requestIdleCallback) requestIdleCallback(make, {timeout:1500})
+    else make()
+  }, wait)
 }
 
 /**
@@ -283,13 +310,38 @@ function _takeWarm(mId, url){
   return v
 }
 
-// 크로스페이드 중 영상 대기를 취소하는 함수 (새 슬라이드 전환 시 사용)
-let _videoCancelFn = null
-
 // ── 영상 싱크 (송출 → 편집 창) ──
 // 송출 영상을 기준 시계로 삼는다. 송출 쪽은 절대 강제로 seek하지 않으므로 끊김이 없고,
 // 편집 미리보기가 이 보고값을 받아 재생 속도를 미세 조정해 따라온다.
 let _vidLayer = 'A'
+
+// ── 배경 밝기 ──
+// 편집 창의 배경 컨트롤에서 정한 밝기(1 = 원래 밝기)를 배경 사진·영상 컨테이너(#MA/#MB/#GBG)에만 건다.
+// 가사·텍스트에는 걸지 않는다. 1이면 filter를 비워 불필요한 합성 레이어를 만들지 않는다.
+// PPT 내보내기(__captureSlide)는 bgb를 보내지 않으므로 항상 원래 밝기다.
+function _bgFilter(v){
+  const n = Number(v)
+  if (v == null || !Number.isFinite(n) || Math.abs(n - 1) < 0.001) return ''
+  return `brightness(${Math.max(0, Math.min(2, n))})`
+}
+
+/**
+ * 배경 컨테이너의 밝기 filter를 바꾼다. dur(초)이 있으면 그 시간 동안 부드럽게 바뀐다.
+ * Web Animations는 합성 스레드에서 돌아 영상이 재생 중이어도 끊기지 않는다.
+ */
+function _setBgFilter(el, f, dur){
+  if (!el) return
+  // 바뀌는 중이었다면 지금 보이는 값에서 이어서 바꾼다
+  const from = el._bgFilterAnim ? getComputedStyle(el).filter : (el.style.filter || 'none')
+  if (el._bgFilterAnim) { el._bgFilterAnim.cancel(); el._bgFilterAnim = null }
+  el.style.filter = f
+  const to = f || 'none'
+  if (dur > 0 && from !== to && el.animate) {
+    const a = el.animate([{ filter: from }, { filter: to }], { duration: dur * 1000, easing: 'ease-in-out' })
+    el._bgFilterAnim = a
+    a.onfinish = () => { if (el._bgFilterAnim === a) el._bgFilterAnim = null }
+  }
+}
 
 // 그룹 배경 영상 레이어 (같은 그룹 영상을 쓰는 슬라이드끼리는 영상을 이어서 재생)
 let _gbgLayer = null
@@ -307,22 +359,38 @@ function _getGbgLayer(){
   }
   return _gbgLayer
 }
-/** 슬라이드 데이터의 gbg에 맞춰 그룹 영상 레이어를 보이거나 숨긴다 */
+/** 슬라이드 데이터의 gbg에 맞춰 그룹 영상 레이어를 보이거나 숨긴다. 보이는 영상 요소를 돌려준다 (없으면 null) */
 function _updateGroupBg(d, fd){
   const layer = _getGbgLayer()
-  if (!layer) return
+  if (!layer) return null
   const g = d && d.gbg
-  if (!g) { layer.hide(fd); return }
+  // 사라지는 영상은 원래 밝기를 유지한 채 페이드아웃되도록, 보일 때만 밝기를 바꾼다
+  if (!g) { layer.hide(fd); return null }
+  _setBgFilter(document.getElementById('GBG'), _bgFilter(d.bgb), fd)
   if (g.key && g.url) _mediaCache[g.key] = g.url
   const url = (g.key && _mediaCache[g.key]) || g.url
-  layer.show({ ...g, url }, fd)
+  return layer.show({ ...g, url }, fd)
+}
+
+/** 레이어(.ml) 안에서 지금 보이며 재생 중인 영상 요소. 반복 이어달리기 중이면 쌍둥이 쪽일 수 있다 */
+function _activeVidIn(ml){
+  const v = ml ? ml.querySelector('video:not([data-loop-twin])') : null
+  return (v && window.VideoLoop) ? VideoLoop.active(v) : v
+}
+
+/** 영상을 완전히 내려 디코더를 바로 돌려준다 (반복 이어달리기 쌍둥이까지) */
+function _unloadVideosIn(el){
+  if (!el) return
+  el.querySelectorAll('video:not([data-loop-twin])').forEach(v => {
+    const keep = window.VideoLoop ? VideoLoop.detach(v) : v
+    ;[v, keep].forEach(x => { try { x.pause(); x.removeAttribute('src'); x.load() } catch (e) {} })
+  })
 }
 
 /** 현재 송출 중인 영상 요소 (없으면 null) */
 function _getOutVid(){
   if (_gbgLayer && _gbgLayer.active()) return _gbgLayer.video()
-  const ml = document.getElementById('M' + _vidLayer)
-  return ml ? ml.querySelector('video') : null
+  return _activeVidIn(document.getElementById('M' + _vidLayer))
 }
 
 function _reportVideoState(){
@@ -437,20 +505,30 @@ function renderShapeBoxes(layerId, boxes){
   });
 }
 
+/** 슬라이드 데이터의 배경 미디어 주소 (mId 캐시에서 복원). 처음 받은 data URL은 캐시에 등록한다 */
+function _mediaURLOf(d){
+  if (d.mId && d.mURL) _mediaCache[d.mId] = d.mURL
+  return (d.mId && _mediaCache[d.mId]) ? _mediaCache[d.mId] : (d.mURL || '')
+}
+
+/**
+ * 배경 미디어 캐시 키: 미디어와 위치·배율·맞춤, 영상 설정(소리·반복·자동재생)까지 같으면 같은 키.
+ * 레이어의 dataset.cacheKey와 비교해 다시 그릴지, 영상을 이어서 재생할지 정한다.
+ */
+function _mediaKeyOf(d){
+  const mFit = ['cover','contain','fill'].includes(d.mFit) ? d.mFit : 'cover'
+  return `${d.mId || _mediaURLOf(d)}|${d.mOffX ?? 50}|${d.mOffY ?? 50}|${d.mScale ?? 100}|${mFit}|${!!d.mAudioEnabled}|${d.mLoop!==false}|${d.mAutoPlay!==false}|${d.mLoopMode || 'normal'}|${d.mLoopFade ?? 1}`
+}
+
 /**
  * 다음 슬라이드의 영상을 화면 밖 숨겨진 요소로 미리 버퍼링한다.
  * fillL에서 이 요소를 재사용하면 전환 시 딜레이가 사라진다.
  */
 function _prefetchVideo(data) {
   if (!data || data.mType !== 'video') return
-  if (data.mId && data.mURL) _mediaCache[data.mId] = data.mURL
-  const url = (data.mId && _mediaCache[data.mId]) ? _mediaCache[data.mId] : (data.mURL || '')
+  const url = _mediaURLOf(data)
   if (!url) return
-  const mOffX = data.mOffX ?? 50
-  const mOffY = data.mOffY ?? 50
-  const mScale = data.mScale ?? 100
-  const mFit = ['cover','contain','fill'].includes(data.mFit) ? data.mFit : 'cover'
-  const key = `${data.mId || url}|${mOffX}|${mOffY}|${mScale}|${mFit}|${!!data.mAudioEnabled}|${data.mLoop !== false}|${data.mAutoPlay !== false}|${data.mLoopMode || 'normal'}|${data.mLoopFade ?? 1}`
+  const key = _mediaKeyOf(data)
   if (_videoPreloadPool[key]) return
   const vid = document.createElement('video')
   vid.src = url
@@ -518,6 +596,7 @@ document.addEventListener('keydown',e=>{
   }
 
   // 그 외 키는 메인 조작창으로 전달 (단축키 커스터마이징 지원)
+  // repeat: 키를 꾹 눌러 생긴 반복 입력인지 (배경 컨트롤 숫자키는 반복 입력을 무시한다)
   window.electronAPI?.sendOutputControl?.({
     type:'key',
     key:e.key,
@@ -525,9 +604,55 @@ document.addEventListener('keydown',e=>{
     altKey:!!e.altKey,
     ctrlKey:!!e.ctrlKey,
     metaKey:!!e.metaKey,
-    shiftKey:!!e.shiftKey
+    shiftKey:!!e.shiftKey,
+    repeat:!!e.repeat
   });
 });
+
+/** 클릭 시 재생: 화면을 한 번 클릭하면 이 영상을 재생한다 */
+function _armClickToPlay(vid, wantAudio){
+  _clearClickToPlay()
+  _clickToPlayHandler = () => {
+    vid.muted = !wantAudio
+    vid.volume = 1
+    vid.play().catch(() => {})
+    _clickToPlayHandler = null
+  }
+  document.addEventListener('click', _clickToPlayHandler, { once: true })
+}
+
+/**
+ * 이어 재생: 지금 보이는 레이어(fromMl)의 영상이 다음 슬라이드에도 같은 위치·같은 설정으로 쓰이면
+ * 재생 중인 <video>를 새 레이어(toMl)로 옮긴다. 같은 문서 안에서 바로 옮기면 재생이 끊기지 않으므로
+ * 슬라이드를 넘겨도 영상이 처음부터 다시 시작하거나 멈추지 않는다. 옮겼으면 true.
+ */
+function _carryVideo(fromMl, toMl, d){
+  if (!fromMl || !toMl || d.mType !== 'video') return false
+  const key = _mediaKeyOf(d)
+  if (fromMl.dataset.cacheKey !== key) return false
+  // 반복 이어달리기 쌍둥이도 함께, 겹친 순서 그대로 옮긴다
+  const vids = [...fromMl.querySelectorAll('video')]
+  if (!vids.some(v => !v.hasAttribute('data-loop-twin'))) return false
+  _unloadVideosIn(toMl)
+  while (toMl.firstChild) toMl.removeChild(toMl.firstChild)
+  vids.forEach(v => toMl.appendChild(v))
+  toMl.dataset.cacheKey = key
+  fromMl.dataset.cacheKey = ''
+  return true
+}
+
+/**
+ * 다음 슬라이드 영상을 미리 버퍼링한다.
+ * 지금과 같은 영상이면 이어서 재생하므로, 송출 시작 때 미리 디코딩해 둔 영상(워밍 풀)이 있으면 그걸 쓰므로 필요 없다.
+ * (같은 영상을 하나 더 열면 그만큼 디코더를 새로 만들어 재생 중인 영상이 멈칫할 수 있다)
+ */
+function _prefetchNext(d){
+  const nx = d && d.nxtMedia
+  if (!nx) return
+  if (d.mType === 'video' && nx.mType === 'video' && _mediaKeyOf(nx) === _mediaKeyOf(d)) return
+  if (nx.mId && _warmPool[nx.mId]) return
+  _prefetchVideo(nx)
+}
 
 /**
  * 지정된 레이어(A 또는 B)에 슬라이드 내용을 채운다.
@@ -553,8 +678,10 @@ document.addEventListener('keydown',e=>{
  *     d.mOffX/Y         - 미디어 위치 오프셋(%)
  *     d.mScale          - 미디어 확대 비율(%)
  *     d.textBoxes       - 추가 텍스트박스 배열
+ * @param {Object} [opts]
+ *     opts.carried      - 바로 앞 슬라이드의 같은 영상을 이 레이어로 옮겨 왔음 (되감지 않고 이어서 재생)
  */
-function fillL (L, d) {
+function fillL (L, d, opts) {
   // 가장 최근에 그린 레이어 = 현재 영상이 재생되는 레이어 (크로스페이드 중에도 새 쪽을 가리킴)
   _vidLayer = L
   const _mlEl = document.getElementById('M' + L)
@@ -653,18 +780,21 @@ function fillL (L, d) {
   // 배경 미디어(이미지/영상) 처리
   // mId 기반 캐시: index.html이 처음 한 번만 전체 data URL을 보내고
   // 이후엔 mId만 전송하므로, 여기서 캐시에서 URL을 복원한다.
-  if (d.mId && d.mURL) _mediaCache[d.mId] = d.mURL  // 신규 미디어 등록
-  const resolvedURL = (d.mId && _mediaCache[d.mId]) ? _mediaCache[d.mId] : (d.mURL || '')
+  const resolvedURL = _mediaURLOf(d)
 
   const ml = document.getElementById('M'+L)
+  // 배경 밝기는 새로 그리는 레이어에만 건다 → 크로스페이드 중에도 사라지는 배경은 이전 밝기 유지
+  _setBgFilter(ml, _bgFilter(d.bgb), 0)
   const mOffX = d.mOffX ?? 50
   const mOffY = d.mOffY ?? 50
   const mScale = d.mScale ?? 100
   const mFit = ['cover','contain','fill'].includes(d.mFit) ? d.mFit : 'cover'
   // cacheKey: 영상 설정(소리·반복·자동재생)도 포함해 설정 변경 시 비디오 재생성
-  const mCacheKey = `${d.mId || resolvedURL}|${mOffX}|${mOffY}|${mScale}|${mFit}|${!!d.mAudioEnabled}|${d.mLoop!==false}|${d.mAutoPlay!==false}|${d.mLoopMode || 'normal'}|${d.mLoopFade ?? 1}`
+  const mCacheKey = _mediaKeyOf(d)
   if (ml.dataset.cacheKey !== mCacheKey) {
     ml.dataset.cacheKey = mCacheKey
+    // 이전 영상은 디코더를 바로 돌려주도록 완전히 내린다 (그냥 떼어 내면 한동안 메모리에 남는다)
+    _unloadVideosIn(ml)
     while (ml.firstChild) ml.removeChild(ml.firstChild)
     if (resolvedURL) {
       // 미디어를 지정한 오프셋/배율/맞춤 모드로 배치하는 공통 CSS
@@ -711,26 +841,28 @@ function fillL (L, d) {
           vid.preload = 'auto'
           vid.muted = !wantAudio
           vid.volume = 1
-          _clickToPlayHandler = ()=>{
-            vid.muted = !wantAudio
-            vid.volume = 1
-            vid.play().catch(()=>{})
-            _clickToPlayHandler = null
-          }
-          document.addEventListener('click', _clickToPlayHandler, {once:true})
+          _armClickToPlay(vid, wantAudio)
         }
       }
     }
+  } else if (d.mType === 'video' && opts && opts.carried) {
+    // 바로 앞 슬라이드와 같은 영상을 넘겨받음: 멈추거나 되감지 않고 그대로 이어서 재생
+    // (클릭 시 재생 영상이 아직 시작 전이면 클릭 대기만 다시 걸어 둔다)
+    const v = _activeVidIn(ml)
+    if (v && v.paused && !v.ended && d.mAutoPlay === false) _armClickToPlay(v, !!d.mAudioEnabled)
   } else if (d.mType === 'video') {
-    // 동일 영상 재사용(캐시 히트): 항상 처음부터 다시 재생
-    const existingVid = ml.querySelector('video')
-    if (existingVid && d.mAutoPlay !== false) {
-      existingVid.currentTime = 0
-      existingVid.muted = true
-      existingVid.play().then(() => {
-        existingVid.muted = !d.mAudioEnabled
-        existingVid.volume = 1
-      }).catch(() => {})
+    // 같은 영상이 이 레이어에 멈춘 채 남아 있음 (예: 영상 → 사진 → 같은 영상):
+    // 처음으로 되감지 않고 멈춘 자리에서 이어서 재생한다 (되감으면 처음부터 다시 나오고, 무거운 영상은 잠깐 멈춘다)
+    const v = _activeVidIn(ml)
+    if (v && d.mAutoPlay !== false) {
+      if (v.paused) {
+        v.muted = true
+        v.play().then(() => { v.muted = !d.mAudioEnabled; v.volume = 1 }).catch(() => {})
+      } else {
+        v.muted = !d.mAudioEnabled
+      }
+    } else if (v && v.paused && !v.ended) {
+      _armClickToPlay(v, !!d.mAudioEnabled)
     }
   }
 }
@@ -740,29 +872,25 @@ function fillL (L, d) {
  * 페이드 시간(fd)이 있으면 A↔B 레이어를 교차해 크로스페이드,
  * 없으면 현재 레이어를 바로 업데이트한다.
  *
- * 크로스페이드 동작:
- *   1. 사용하지 않는 레이어(nL)에 새 슬라이드 내용을 미리 그린다.
- *   2. nL을 불투명(opacity: 1), 현재 레이어(sL)를 투명(opacity: 0)으로 전환.
- *   3. Web Animations API로 두 레이어를 동시에 애니메이션.
- *   4. sL ↔ nL 교체.
+ * 크로스페이드 동작 (끊기지 않고 부드럽게):
+ *   1. 사용하지 않는 레이어(nL)에 새 슬라이드를 그려 현재 레이어(sL) 뒤에 둔다.
+ *      바로 앞 슬라이드와 같은 영상이면 재생 중인 영상을 nL로 옮겨 이어서 재생한다.
+ *   2. 사라지는 쪽 영상은 소리만 끄고 페이드가 끝날 때까지 계속 재생한다 (멈추면 화면이 굳어 끊겨 보인다).
+ *   3. 새로 나타날 사진·영상의 첫 화면이 준비된 뒤(최대 0.7초) 현재 레이어를 1→0으로 페이드아웃한다.
+ *      Web Animations로 돌리므로 합성 스레드에서 처리되어, 영상 디코딩 등으로 바빠도 끊기지 않는다.
+ *   4. 끝나면 sL ↔ nL 교체, 사라진 레이어의 영상 정지, 다음 슬라이드 영상 미리 버퍼링.
  *
  * @param {Object} d - 슬라이드 데이터 (fillL과 동일한 구조)
  */
 function applySlide (d) {
   const fd = d.fd || 0  // 페이드 시간(초)
 
-  // 진행 중인 영상 대기 취소 (새 슬라이드 전환 시)
-  if (_videoCancelFn) { _videoCancelFn(); _videoCancelFn = null }
-
   // 슬라이드 전환 시 이전 클릭재생 핸들러 제거
   _clearClickToPlay()
 
-  // 이전에 실행 중인 페이드 취소
+  // 이전 전환이 아직 진행 중이면 바로 끝낸다
   _fadeAnims.forEach(a => { if (a.cancel) a.cancel() })
   _fadeAnims = []
-
-  // 다음 슬라이드에 영상이 있으면 지금 바로 백그라운드에서 버퍼링 시작
-  if (d.nxtMedia) _prefetchVideo(d.nxtMedia)
 
   // 현재 보이는 레이어와 다음에 쓸 레이어
   const curEl = document.getElementById('L' + sL)
@@ -771,16 +899,19 @@ function applySlide (d) {
 
   if (fd > 0) {
     // ── 크로스페이드 모드 ──
-    // 다음 슬라이드를 뒤(nEl, opacity=1)에 즉시 배치하고
-    // 현재 슬라이드(curEl)만 opacity 1→0 으로 페이드아웃
+    // 다음 슬라이드를 뒤(nEl, opacity=1)에 배치하고 현재 슬라이드(curEl)만 opacity 1→0 으로 페이드아웃
     // — 검정 배경이 비치지 않도록 nEl이 항상 뒤에서 보인다
     // 크로마키 상태는 fillL에서 레이어별로 토글되므로 페이드와 자연스럽게 어우러짐
+    const carried = _carryVideo(document.getElementById('M' + sL), document.getElementById('M' + nL), d)
+    // 영상을 넘겨준 현재 레이어의 배경색이 페이드 중에 비치지 않게 한다
+    if (carried) curEl.style.backgroundColor = 'transparent'
+    // 사라지는 쪽 영상은 소리만 끄고 계속 재생 (페이드가 끝나면 정지). 반복 이어달리기 쌍둥이도 함께
+    const outVids = [...curEl.querySelectorAll('video')]
+    outVids.forEach(v => { v.muted = true })
 
-    // 현재 레이어(사라지는 쪽)의 영상을 즉시 정지 (소리 포함)
-    curEl.querySelectorAll('video').forEach(v => { v.pause(); v.muted = true })
-
-    fillL(nL, d)
-    _updateGroupBg(d, fd)
+    const prevGbg = (_gbgLayer && _gbgLayer.active()) ? _gbgLayer.video() : null
+    fillL(nL, d, { carried })
+    const gbgVid = _updateGroupBg(d, fd)
 
     nEl.style.transition = 'none'
     nEl.style.opacity    = '1'
@@ -789,45 +920,47 @@ function applySlide (d) {
     curEl.style.opacity    = '1'
     curEl.style.zIndex     = '2'
 
-    let rafId = null
-    let _done = false
-    const t0 = performance.now()
-
-    const tick = (now) => {
-      if (_done) return
-      const t = Math.min(1, (now - t0) / (fd * 1000))
-      curEl.style.opacity = String(1 - t)
-      if (t < 1) {
-        rafId = requestAnimationFrame(tick)
-      } else {
-        // 페이드 완료: 레이어 역할 교체
-        curEl.style.opacity = '0'
-        curEl.style.zIndex  = '1'
-        nEl.style.zIndex    = '2'
-        sL = nL
-        _done = true
-        rafId = null
-      }
+    const READY_WAIT = 700  // 새 화면 준비를 기다리는 최대 시간(ms)
+    let anim = null, finished = false
+    const finish = () => {
+      if (finished) return
+      finished = true
+      clearTimeout(safety)
+      if (anim) { try { anim.cancel() } catch (e) {} ; anim = null }
+      // 레이어 역할 교체
+      curEl.style.opacity = '0'
+      curEl.style.zIndex  = '1'
+      nEl.style.opacity   = '1'
+      nEl.style.zIndex    = '2'
+      sL = nL
+      // 사라진 레이어의 영상은 이제 멈춘다
+      outVids.forEach(v => { if (curEl.contains(v)) v.pause() })
+      // 다음 슬라이드 영상 미리 버퍼링은 전환이 끝난 뒤에 (전환 중 디코딩 부담을 줄인다)
+      _prefetchNext(d)
     }
-    rafId = requestAnimationFrame(tick)
+    // 페이드 끝 알림이 오지 않는 경우를 대비한 안전장치
+    const safety = setTimeout(finish, READY_WAIT + fd * 1000 + 500)
+    _transitionUntil = performance.now() + READY_WAIT + fd * 1000
+    _fadeAnims = [{ cancel: finish }]
 
-    _fadeAnims = [{
-      cancel: () => {
-        _done = true
-        if (rafId) { cancelAnimationFrame(rafId); rafId = null }
-        // 즉시 nEl을 활성 레이어로 전환
-        curEl.style.opacity = '0'
-        curEl.style.zIndex  = '1'
-        nEl.style.opacity   = '1'
-        nEl.style.zIndex    = '2'
-        sL = nL
-      }
-    }]
+    // 새로 나타날 사진·영상의 첫 화면을 기다린 뒤 페이드 (이어 재생하는 영상은 이미 재생 중이라 바로 통과)
+    const incoming = [...nEl.querySelectorAll('.ml img, .ml video:not([data-loop-twin])')]
+    if (gbgVid && gbgVid !== prevGbg) incoming.push(gbgVid)
+    const ready = (window.VideoLoop && VideoLoop.whenReady) ? VideoLoop.whenReady(incoming, READY_WAIT) : Promise.resolve()
+    ready.then(() => {
+      if (finished) return
+      anim = curEl.animate([{ opacity: 1 }, { opacity: 0 }], { duration: fd * 1000, easing: 'ease-in-out', fill: 'forwards' })
+      anim.onfinish = finish
+    })
   } else {
     // ── 즉시 전환 모드 ──
+    // 바로 앞 슬라이드와 같은 영상이면 멈추거나 되감지 않고 이어서 재생한다
+    const curMl = document.getElementById('M' + sL)
+    const carried = d.mType === 'video' && !!curMl && curMl.dataset.cacheKey === _mediaKeyOf(d)
     ;['A', 'B'].forEach(l => {
       const ml = document.getElementById('M' + l)
-      if (ml) ml.querySelectorAll('video').forEach(v => { v.muted = true; v.pause() })
+      if (!ml || (carried && l === sL)) return
+      ml.querySelectorAll('video').forEach(v => { v.muted = true; v.pause() })
     })
     nEl.style.transition = 'none'
     nEl.style.opacity    = '0'
@@ -835,8 +968,9 @@ function applySlide (d) {
     curEl.style.transition = 'none'
     curEl.style.opacity    = '1'
     curEl.style.zIndex     = '2'
-    fillL(sL, d)
+    fillL(sL, d, { carried })
     _updateGroupBg(d, 0)
+    _prefetchNext(d)
   }
 
   // 발표자 모드: 반투명 오버레이로 현재/다음 슬라이드 텍스트 표시
@@ -862,6 +996,8 @@ window.__captureSlide = async function (d) {
 
   applySlide(Object.assign({}, d, { fd: 0, mode: null, nxtMedia: null }))
   const layer = document.getElementById('L' + sL)
+  // 정지 화면만 찍으므로 반복 이어달리기(두 번째 영상)는 쓰지 않는다
+  if (window.VideoLoop) layer.querySelectorAll('video:not([data-loop-twin])').forEach(v => VideoLoop.detach(v))
 
   // 슬라이드에 쓰인 폰트를 명시적으로 불러온다 (fonts.ready만으로는 로드가 시작되기 전일 수 있음)
   const families = new Set([d.ff || 'Noto Serif KR'])
@@ -917,6 +1053,17 @@ if (window.electronAPI) {
     if (visible) ml.style.top = y + '%'
   })
 
+  // 배경 밝기: 편집 창의 배경 컨트롤 → 지금 보이는 배경(사진·영상)에 반영
+  //   { v: 밝기(1 = 원래 밝기), dur: 바뀌는 시간(초) } — 슬라이더는 바로, '원래 밝기' 버튼은 dur 동안 부드럽게
+  if (window.electronAPI.onBgBrightness) {
+    window.electronAPI.onBgBrightness((msg) => {
+      const m = (msg && typeof msg === 'object') ? msg : { v: msg }
+      const f = _bgFilter(m.v)
+      const dur = Math.max(0, Number(m.dur) || 0)
+      ;['MA', 'MB', 'GBG'].forEach(id => _setBgFilter(document.getElementById(id), f, dur))
+    })
+  }
+
   // 편집 창에서 클릭 → 현재 레이어의 영상 재생 (클릭 시 재생 모드)
   if (window.electronAPI.onVideoPlay) {
     window.electronAPI.onVideoPlay(() => {
@@ -969,6 +1116,10 @@ if (window.electronAPI) {
       warmNext()
     })
   }
+
+  // 수신 준비가 끝났음을 알린다 → 조작창이 지금 화면을 배경 주소까지 처음부터 다시 보낸다
+  // (글꼴 로딩 등으로 이 창이 늦게 준비되면 열 때 보낸 화면을 놓치기 때문)
+  if (window.electronAPI.sendScreenReady) window.electronAPI.sendScreenReady()
 }
 </script>
 </body>
