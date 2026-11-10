@@ -92,17 +92,25 @@ contextBridge.exposeInMainWorld("settingsAPI", {
 // 열고 닫거나 데이터를 주고받는다.
 // ──────────────────────────────────────────────────────────
 contextBridge.exposeInMainWorld("electronAPI", {
-  // 외부 모니터(또는 현재 모니터)에 송출 화면 열기
-  openSecondScreen: () => ipcRenderer.invoke("open-second-screen"),
-  // 외부 송출 화면 닫기
+  // 송출 화면 열기: 조작창이 없는 외부 모니터마다 하나씩 (외부 모니터가 없으면 현재 모니터)
+  //   opts: { ids: 송출할 모니터 id 목록 (송출을 꺼 둔 모니터 빼기), start: [송출 시작] 버튼 }
+  //   start 없이 부르면 송출 중일 때만 송출 창을 ids에 맞춘다 (모니터 연결, 화면별 송출 켜고 끄기)
+  //   → { success, alreadyOpen, displays }
+  openSecondScreen: (opts) => ipcRenderer.invoke("open-second-screen", opts),
+  // 송출 화면 모두 닫기
   closeSecondScreen: () => ipcRenderer.invoke("close-second-screen"),
+  // 송출할 수 있는 모니터 목록 → { displays: [{ id, label, w, h, internal, main, open }] }
+  getOutputDisplays: () => ipcRenderer.invoke("output-displays:get"),
+  // 모니터 연결·해제, 송출 창 열기·닫기 알림 (형식은 getOutputDisplays와 같음)
+  onOutputDisplays: (cb) => registerSingleListener("output-displays", cb),
 
   // 현재 슬라이드 데이터를 송출 화면으로 전달 (두 이름 모두 동일 채널)
-  sendSlide: (data) => ipcRenderer.send("slide-update", data),
-  sendSlideUpdate: (data) => ipcRenderer.send("slide-update", data),
+  // to: 그 송출 화면(모니터 id)에만 보낼 때 — 새로 열린 송출 화면에 지금 화면을 다시 보낼 때. 없으면 모든 송출 화면
+  sendSlide: (data, to) => ipcRenderer.send("slide-update", data, to),
+  sendSlideUpdate: (data, to) => ipcRenderer.send("slide-update", data, to),
 
-  // 화면 블랙아웃(on=true) / 해제(on=false)
-  blankScreen: (on) => ipcRenderer.send("blank-screen", on),
+  // 화면 블랙아웃(on=true) / 해제(on=false). to: 그 송출 화면에만 (없으면 모두)
+  blankScreen: (on, to) => ipcRenderer.send("blank-screen", on, to),
 
   // 자동재생 진행 바 상태 전달 (action: start/stop/tick, secs: 남은 시간)
   sendProgressBar: (data) => ipcRenderer.send("progress-bar", data),
@@ -111,11 +119,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
   onSecondScreenClosed: (cb) =>
     registerSingleListener("second-screen-closed", cb, () => undefined),
 
-  // 송출 화면 준비 완료: screen.html이 수신 준비를 마치면 알리고, 조작창은 지금 화면을 다시 보낸다
-  // (송출 창이 늦게 뜨면 열 때 보낸 첫 화면과 배경 주소를 놓치기 때문)
+  // 송출 화면 준비 완료: screen.html이 수신 준비를 마치면 알리고, 조작창은 그 송출 화면에 지금 화면을 다시 보낸다
+  // (송출 창이 늦게 뜨면 열 때 보낸 첫 화면과 배경 주소를 놓치기 때문). 조작창은 { id: 그 송출 화면의 모니터 id }를 받는다
   sendScreenReady: () => ipcRenderer.send("screen-ready"),
   onScreenReady: (cb) =>
-    registerSingleListener("screen-ready", cb, () => undefined),
+    registerSingleListener("screen-ready", cb),
 
   // 슬라이드 데이터 수신 콜백 등록 (screen.html에서 사용)
   onSlideUpdate: (cb) =>
@@ -144,8 +152,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
     registerSingleListener("output-control", callback),
   removeOutputControlListener: () => unregisterSingleListener("output-control"),
 
-  // 위치 마커 선: { visible, y } 형태로 송출 화면에 전달
-  sendMarkerLine: (data) => ipcRenderer.send("marker-line", data),
+  // 위치 마커 선: { visible, y } 형태로 송출 화면에 전달. to: 그 송출 화면에만 (없으면 모두)
+  sendMarkerLine: (data, to) => ipcRenderer.send("marker-line", data, to),
   onMarkerLine: (cb) => registerSingleListener("marker-line", cb),
   removeMarkerLineListener: () => unregisterSingleListener("marker-line"),
 
@@ -154,6 +162,13 @@ contextBridge.exposeInMainWorld("electronAPI", {
   sendBgBrightness: (v, dur) => ipcRenderer.send("bg-brightness", { v, dur }),
   onBgBrightness: (cb) => registerSingleListener("bg-brightness", cb),
   removeBgBrightnessListener: () => unregisterSingleListener("bg-brightness"),
+
+  // 화면 자르기: 편집 창의 프로젝터 설정 → 그 송출 화면 (송출 화면마다 따로)
+  // id: 송출 화면의 모니터 id
+  // crop: { t, r, b, l: 위·오른쪽·아래·왼쪽에서 자를 만큼(슬라이드 크기의 %), fit: 남은 곳에 슬라이드 전체를 줄여 넣기 }
+  sendOutputCrop: (id, crop) => ipcRenderer.send("output-crop", id, crop),
+  onOutputCrop: (cb) => registerSingleListener("output-crop", cb),
+  removeOutputCropListener: () => unregisterSingleListener("output-crop"),
 
   // 전체화면 상태 변경 알림 (true=진입, false=해제)
   onWindowFullscreenChange: (cb) => registerSingleListener("window-fullscreen-change", cb),
@@ -182,8 +197,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // { data: ArrayBuffer, ext: 확장자 } → { ok, url }
   saveTempMedia: (payload) => ipcRenderer.invoke("media:save-temp", payload),
 
-  // 송출 시작 시 전체 영상 목록을 보내 송출 화면이 사전 워밍하게 한다.
-  sendPrewarm: (list) => ipcRenderer.send("prewarm-media", list),
+  // 곧 나올 영상 목록 [{ key, url }]을 보내 송출 화면이 앞의 몇 개만 미리 준비하게 한다. to: 그 송출 화면에만 (없으면 모두)
+  sendPrewarm: (list, to) => ipcRenderer.send("prewarm-media", list, to),
   onPrewarmMedia: (cb) => registerSingleListener("prewarm-media", cb),
   removePrewarmMediaListener: () => unregisterSingleListener("prewarm-media"),
 });

@@ -40,7 +40,9 @@ try { ({ autoUpdater } = require("electron-updater")); } catch(e) { console.warn
 
 // ── 전역 창 참조 ──
 let mainWin   = null;  // 메인 조작창 (index.html)
-let secondWin = null;  // 외부 송출 화면 (screen.html)
+// 외부 송출 화면 (screen.html): 모니터(display.id 문자열) → 창. 외부 모니터마다 하나씩 열어 같은 슬라이드를 함께 송출한다.
+// 넣은 순서 = 연 순서. 맨 앞 창이 기준 송출 화면이다 (영상 재생 위치를 조작창에 알리고, 소리를 낸다)
+const outWins = new Map();
 
 // 현재 열려있는 프로젝트(.wsproj) 파일의 절대 경로. 저장/열기 시 갱신된다.
 // "덮어쓰기 저장"은 이 경로에 dialog 없이 바로 기록한다.
@@ -1476,40 +1478,117 @@ function createMainWindow() {
 
   // 메인 창이 닫히면 송출 화면도 강제 종료
   mainWin.on("closed", () => {
-    if (secondWin && !secondWin.isDestroyed()) {
-      secondWin.close();
-    }
+    for (const w of outputWindows()) w.close();
     mainWin = null;
   });
 }
 
-/**
- * IPC 핸들러: 외부 송출 화면(screen.html)을 열거나 이미 열려 있으면 전면으로 가져온다.
- *
- * 동작:
- *   1. 연결된 외부 모니터가 있으면 그 모니터에 전체화면으로 열기
- *   2. 외부 모니터가 없으면 현재 모니터에 전체화면으로 열기
- *   3. 이미 열려 있으면 포커스만 이동
- *
- * 반환값: { success: boolean, alreadyOpen: boolean }
- */
-ipcMain.handle("open-second-screen", () => {
-  if (secondWin && !secondWin.isDestroyed()) {
-    secondWin.setMenuBarVisibility(false);
-    secondWin.setFullScreen(true);
-    secondWin.focus();
-    return { success: true, alreadyOpen: true };
+// ──────────────────────────────────────────────────────────
+// 송출 화면 (외부 모니터마다 하나씩)
+//   조작창이 있는 모니터를 뺀 모든 모니터에 송출 창을 하나씩 열어 같은 슬라이드를 함께 내보낸다.
+//   화면 자르기는 송출 창마다 따로 받는다 (조작창이 모니터마다 기억해 둔 값).
+//   조작창에서 송출을 꺼 둔 모니터에는 열지 않는다.
+//   외부 모니터가 하나도 없으면 [송출 시작] 때만 조작창이 있는 모니터에 연다 (예전과 같음).
+// ──────────────────────────────────────────────────────────
+
+/** 조작창이 있는 모니터 (조작창이 없으면 주 모니터) */
+function mainDisplay() {
+  if (mainWin && !mainWin.isDestroyed()) {
+    // 최소화된 창은 getBounds()가 화면 밖 좌표일 수 있어 원래 자리로 찾는다
+    const b = mainWin.isMinimized() ? mainWin.getNormalBounds() : mainWin.getBounds();
+    return screen.getDisplayMatching(b);
   }
+  return screen.getPrimaryDisplay();
+}
 
-  // 외부 모니터 탐색 (없으면 현재 모니터 사용)
-  const displays       = screen.getAllDisplays();
-  const primaryDisplay = screen.getPrimaryDisplay();
-  const external       = displays.find(display => display.id !== primaryDisplay.id);
-  const targetDisplay  = external || primaryDisplay;
+/** 송출할 외부 모니터: 조작창이 있는 모니터를 뺀 모두. 왼쪽 → 오른쪽 (같으면 위 → 아래) 순 */
+function externalDisplays(mainId = mainDisplay().id) {
+  return screen.getAllDisplays()
+    .filter(d => d.id !== mainId)
+    .sort((a, b) => (a.bounds.x - b.bounds.x) || (a.bounds.y - b.bounds.y));
+}
 
-  const { x, y, width, height } = targetDisplay.bounds;
+/** 그 모니터의 송출 창 (없거나 닫혔으면 null) */
+function liveOutWin(id) {
+  const w = outWins.get(String(id));
+  return (w && !w.isDestroyed()) ? w : null;
+}
 
-  secondWin = new BrowserWindow({
+/** 열려 있는 송출 창들 (연 순서) */
+function outputWindows() {
+  return [...outWins.values()].filter(w => !w.isDestroyed());
+}
+
+/** 기준 송출 창: 열려 있는 창 중 맨 먼저 연 창 */
+function masterOutWin() {
+  return outputWindows()[0] || null;
+}
+
+/** 이 webContents가 송출 창이면 그 모니터 id (PPT 캡처용 숨김 창 등은 null) */
+function outputIdOf(wc) {
+  for (const [id, w] of outWins) {
+    if (!w.isDestroyed() && w.webContents === wc) return id;
+  }
+  return null;
+}
+
+/**
+ * 송출 창에 보낸다. to(모니터 id)가 있으면 그 송출 창에만, 없으면 모든 송출 창에.
+ * (to는 새로 열린 송출 창에만 지금 화면을 다시 보낼 때 쓴다 — 이미 송출 중인 창은 다시 그리지 않게)
+ */
+function sendToOutputs(channel, payload, to) {
+  if (to != null) {
+    const w = liveOutWin(to);
+    if (w) w.webContents.send(channel, payload);
+    return;
+  }
+  for (const w of outputWindows()) w.webContents.send(channel, payload);
+}
+
+/** 소리는 기준 송출 창에서만 낸다 (창마다 내면 같은 소리가 조금씩 어긋나 겹쳐 울린다) */
+function updateOutputAudio() {
+  const master = masterOutWin();
+  for (const w of outputWindows()) w.webContents.setAudioMuted(w !== master);
+}
+
+/**
+ * 조작창에 알리는 송출 화면 목록.
+ * displays: 송출할 수 있는 모니터 [{ id, label: 모니터 이름, w·h: 해상도(화면 픽셀), internal: 노트북 화면,
+ *           main: 조작창이 있는 모니터(외부 모니터가 없을 때만 목록에 든다), open: 송출 창이 열려 있음 }]
+ */
+function outputDisplayInfo() {
+  const mainId = mainDisplay().id;
+  let list = externalDisplays(mainId);
+  if (!list.length) list = screen.getAllDisplays().filter(d => d.id === mainId);
+  return {
+    displays: list.map(d => ({
+      id: String(d.id),
+      label: d.label || "",
+      w: Math.round(d.size.width * d.scaleFactor),
+      h: Math.round(d.size.height * d.scaleFactor),
+      internal: !!d.internal,
+      main: d.id === mainId,
+      open: !!liveOutWin(d.id)
+    }))
+  };
+}
+
+/** 송출 화면 목록이 바뀌었음을 조작창에 알린다 (모니터 연결·해제·설정 변경, 송출 창 열기·닫기) */
+let _outNotifyTimer = null;
+function notifyOutputDisplays() {
+  clearTimeout(_outNotifyTimer);
+  _outNotifyTimer = setTimeout(() => {
+    _outNotifyTimer = null;
+    if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send("output-displays", outputDisplayInfo());
+  }, 200);
+}
+
+/** 모니터 하나에 송출 창을 전체화면으로 연다 */
+function createOutputWindow(display) {
+  const id = String(display.id);
+  const { x, y, width, height } = display.bounds;
+
+  const win = new BrowserWindow({
     x, y, width, height,
     title: "Cheon Myeong Slide Pro Output",
     backgroundColor: "#000000",
@@ -1523,55 +1602,104 @@ ipcMain.handle("open-second-screen", () => {
       nodeIntegration: false
     }
   });
+  outWins.set(id, win);
 
-  secondWin.setMenuBarVisibility(false);
-  secondWin.setFullScreen(true);
-  secondWin.loadFile("screen.html");
+  win.setMenuBarVisibility(false);
+  win.setFullScreen(true);
+  win.loadFile("screen.html");
 
-  // 송출 창 오디오가 시스템에서 음소거되지 않도록 보장
-  secondWin.webContents.on("dom-ready", () => {
-    secondWin.webContents.setAudioMuted(false);
-  });
+  // 소리는 기준 송출 창만 (불러온 뒤에도 기준 창이 시스템에서 음소거되지 않도록 다시 맞춘다)
+  updateOutputAudio();
+  win.webContents.on("dom-ready", updateOutputAudio);
 
-  // 송출 화면이 닫히면 조작창에 이벤트 알림
-  secondWin.on("closed", () => {
-    secondWin = null;
-    if (mainWin && !mainWin.isDestroyed()) {
+  // 송출 창이 닫히면 목록을 알리고, 마지막 창이었으면 송출이 끝났음을 알린다
+  win.on("closed", () => {
+    if (outWins.get(id) === win) outWins.delete(id);
+    updateOutputAudio();
+    notifyOutputDisplays();
+    if (!outputWindows().length && mainWin && !mainWin.isDestroyed()) {
       mainWin.webContents.send("second-screen-closed");
     }
   });
+  return win;
+}
 
-  return { success: true, alreadyOpen: false };
+/**
+ * IPC 핸들러: 송출 화면을 연다 / 송출할 모니터에 맞춘다.
+ *   opts.ids   : 송출할 모니터 id 목록 (조작창에서 송출을 꺼 둔 모니터는 빠져 있다).
+ *                없거나 맞는 모니터가 없으면 외부 모니터 모두
+ *   opts.start : [송출 시작] 버튼. 외부 모니터가 없으면 조작창이 있는 모니터에 열고(예전과 같음),
+ *                이미 열린 송출 창은 앞으로 가져온다.
+ *                start 없이 부르면(송출 중 모니터 연결·화면 켜고 끄기) 송출 중일 때만 맞추고, 조작창 모니터에는 열지 않는다.
+ *   새 창을 먼저 열고 나서 빠진 모니터의 창을 닫는다 (마지막 창이 먼저 닫혀 송출이 끝난 것으로 처리되지 않게).
+ *
+ * 반환값: { success, alreadyOpen: 이미 송출 중이었음, displays: output-displays 알림과 같은 목록 }
+ */
+ipcMain.handle("open-second-screen", (event, opts) => {
+  const o = (opts && typeof opts === "object") ? opts : {};
+  const start = o.start === true;
+  const wasOpen = outputWindows().length > 0;
+  if (!start && !wasOpen) return { success: false, alreadyOpen: false, ...outputDisplayInfo() };
+
+  const mainId = mainDisplay().id;
+  const ext = externalDisplays(mainId);
+  const ids = Array.isArray(o.ids) ? o.ids.map(String) : [];
+  let targets = ext.filter(d => ids.includes(String(d.id)));
+  if (!targets.length) targets = ext;
+  if (!targets.length) {
+    // 외부 모니터 없음: 송출 시작이면 조작창 모니터에, 송출 중이면 지금 창을 그대로 둔다
+    if (!start) return { success: true, alreadyOpen: wasOpen, ...outputDisplayInfo() };
+    targets = screen.getAllDisplays().filter(d => d.id === mainId);
+  }
+
+  const keep = new Set(targets.map(d => String(d.id)));
+  for (const d of targets) {
+    const w = liveOutWin(d.id);
+    if (!w) {
+      createOutputWindow(d);
+    } else if (start) {
+      // 이미 열려 있으면 앞으로만 (조작창의 키보드 입력은 빼앗지 않는다)
+      w.setMenuBarVisibility(false);
+      w.setFullScreen(true);
+      w.moveTop();
+    }
+  }
+  for (const [id, w] of [...outWins]) {
+    if (!keep.has(id) && !w.isDestroyed()) w.close();
+  }
+  notifyOutputDisplays();
+  return { success: true, alreadyOpen: wasOpen, ...outputDisplayInfo() };
 });
+
+/** IPC 핸들러: 송출할 수 있는 모니터 목록 (형식은 open-second-screen의 displays와 같음) */
+ipcMain.handle("output-displays:get", () => outputDisplayInfo());
 
 /**
  * IPC 핸들러: 슬라이드 데이터를 송출 화면으로 전달한다.
  * index.html → main.js → screen.html 방향으로 중계한다.
  * (렌더러끼리 직접 통신 불가 → 메인 프로세스가 중계)
+ * to: 그 송출 화면(모니터 id)에만 보낼 때. 없으면 모든 송출 화면
  */
-ipcMain.on("slide-update", (event, data) => {
-  if (secondWin && !secondWin.isDestroyed()) {
-    secondWin.webContents.send("slide-update", data);
-  }
+ipcMain.on("slide-update", (event, data, to) => {
+  sendToOutputs("slide-update", data, to);
 });
 
-// 송출 화면이 수신 준비를 마쳤음을 조작창에 알린다 → 조작창이 지금 화면을 다시 보낸다
-// (PPT 캡처용 숨김 창도 screen.html을 쓰므로 송출 창에서 온 것만 전달)
+// 송출 화면이 수신 준비를 마쳤음을 조작창에 알린다 → 조작창이 그 송출 화면에 지금 화면을 다시 보낸다
+// { id: 그 송출 화면의 모니터 id }. PPT 캡처용 숨김 창도 screen.html을 쓰므로 송출 창에서 온 것만 전달
 ipcMain.on("screen-ready", (event) => {
-  if (!secondWin || secondWin.isDestroyed() || event.sender !== secondWin.webContents) return;
+  const id = outputIdOf(event.sender);
+  if (id == null) return;
   if (mainWin && !mainWin.isDestroyed()) {
-    mainWin.webContents.send("screen-ready");
+    mainWin.webContents.send("screen-ready", { id });
   }
 });
 
 /**
  * IPC 핸들러: 블랙아웃(화면 암전)을 켜거나 끈다.
- * on=true이면 검은 오버레이로 화면 전체를 덮는다.
+ * on=true이면 검은 오버레이로 화면 전체를 덮는다. to: 그 송출 화면에만 (없으면 모두)
  */
-ipcMain.on("blank-screen", (event, on) => {
-  if (secondWin && !secondWin.isDestroyed()) {
-    secondWin.webContents.send("blank-screen", on);
-  }
+ipcMain.on("blank-screen", (event, on, to) => {
+  sendToOutputs("blank-screen", on, to);
 });
 
 /**
@@ -1579,9 +1707,7 @@ ipcMain.on("blank-screen", (event, on) => {
  * (현재 송출 화면에서는 진행 바를 표시하지 않으므로 사실상 미사용)
  */
 ipcMain.on("progress-bar", (event, data) => {
-  if (secondWin && !secondWin.isDestroyed()) {
-    secondWin.webContents.send("progress-bar", data);
-  }
+  sendToOutputs("progress-bar", data);
 });
 
 /**
@@ -1609,12 +1735,10 @@ ipcMain.on("output-control", (event, action) => {
 });
 
 /**
- * IPC 핸들러: 위치 마커 선 상태를 송출 화면으로 전달한다.
+ * IPC 핸들러: 위치 마커 선 상태를 송출 화면으로 전달한다. to: 그 송출 화면에만 (없으면 모두)
  */
-ipcMain.on("marker-line", (event, data) => {
-  if (secondWin && !secondWin.isDestroyed()) {
-    secondWin.webContents.send("marker-line", data);
-  }
+ipcMain.on("marker-line", (event, data, to) => {
+  sendToOutputs("marker-line", data, to);
 });
 
 /**
@@ -1626,61 +1750,66 @@ ipcMain.on("bg-brightness", (event, msg) => {
   const v = Number(m.v);
   const dur = Number(m.dur) || 0;
   if (!Number.isFinite(v)) return;
-  if (secondWin && !secondWin.isDestroyed()) {
-    secondWin.webContents.send("bg-brightness", { v: Math.max(0, Math.min(2, v)), dur: Math.max(0, Math.min(5, dur)) });
-  }
+  sendToOutputs("bg-brightness", { v: Math.max(0, Math.min(2, v)), dur: Math.max(0, Math.min(5, dur)) });
 });
 
 /**
- * IPC 핸들러: 편집 창에서 보낸 영상 재생 트리거를 송출 화면으로 중계한다.
+ * IPC 핸들러: 프로젝터 설정의 화면 자르기 값을 그 송출 화면으로 전달한다. 자르기는 송출 화면(모니터)마다 따로다.
+ * id: 송출 화면의 모니터 id
+ * { t, r, b, l: 위·오른쪽·아래·왼쪽에서 자를 만큼(슬라이드 크기의 %, 0~90), fit: 남은 곳에 슬라이드 전체를 줄여 넣기 }
+ * 마주 보는 두 쪽의 합(90% 이하)은 송출 화면이 다시 검사한다.
+ */
+ipcMain.on("output-crop", (event, id, msg) => {
+  if (id == null) return;
+  const m = (msg && typeof msg === "object") ? msg : {};
+  const pct = (v) => { const n = Number(v); return Number.isFinite(n) ? Math.max(0, Math.min(90, n)) : 0; };
+  sendToOutputs("output-crop", { t: pct(m.t), r: pct(m.r), b: pct(m.b), l: pct(m.l), fit: m.fit === true }, id);
+});
+
+/**
+ * IPC 핸들러: 영상 재생 트리거를 모든 송출 화면으로 중계한다.
  * 클릭 시 재생 모드에서 편집 창 클릭 → 송출 화면 영상도 재생.
+ * 송출 화면 하나를 클릭해 재생해도 이리로 와서 다른 송출 화면도 함께 재생한다.
  */
 ipcMain.on("video:play", () => {
-  if (secondWin && !secondWin.isDestroyed()) {
-    secondWin.webContents.send("video:play");
-  }
+  sendToOutputs("video:play");
 });
 
 ipcMain.on("video:seek", (event, time) => {
-  if (secondWin && !secondWin.isDestroyed()) {
-    secondWin.webContents.send("video:seek", time);
-  }
+  sendToOutputs("video:seek", time);
 });
 
 ipcMain.on("video:pause", () => {
-  if (secondWin && !secondWin.isDestroyed()) {
-    secondWin.webContents.send("video:pause");
-  }
+  sendToOutputs("video:pause");
 });
 
 /**
  * IPC 핸들러: 송출 화면 영상의 재생 위치/상태를 편집 창으로 중계한다.
  * 송출 영상이 기준(마스터)이고, 편집 미리보기가 이 값을 따라가며 싱크를 맞춘다.
+ * 송출 화면마다 보고하지만 기준 송출 창(맨 먼저 연 창)의 것만 전한다 (PPT 캡처용 숨김 창의 보고도 뺀다)
  */
 ipcMain.on("video:state", (event, state) => {
+  const master = masterOutWin();
+  if (!master || event.sender !== master.webContents) return;
   if (mainWin && !mainWin.isDestroyed()) {
     mainWin.webContents.send("video:state", state);
   }
 });
 
 /**
- * IPC 핸들러: 송출 시작 시 프로젝트 안의 모든 영상 목록을 송출 화면으로 전달한다.
- * 송출 화면은 이를 받아 미리 디코딩(사전 워밍)해 두므로,
- * 이후 어떤 슬라이드로 이동해도 영상이 버벅이지 않는다.
+ * IPC 핸들러: '곧 나올 영상' 목록 [{ key, url }]을 송출 화면으로 전달한다 (배경 컨트롤 칸 미리보기 등
+ * 슬라이드는 그대로인데 목록이 바뀔 때. 슬라이드를 바꿀 때는 슬라이드 데이터에 함께 간다).
+ * 송출 화면은 앞의 몇 개만 첫 화면까지 미리 준비해 두어 바로 시작한다. to: 그 송출 화면에만 (없으면 모두)
  */
-ipcMain.on("prewarm-media", (event, list) => {
-  if (secondWin && !secondWin.isDestroyed()) {
-    secondWin.webContents.send("prewarm-media", list);
-  }
+ipcMain.on("prewarm-media", (event, list, to) => {
+  sendToOutputs("prewarm-media", list, to);
 });
 
 /**
- * IPC 핸들러: 외부 송출 화면을 닫는다.
+ * IPC 핸들러: 송출 화면을 모두 닫는다.
  */
 ipcMain.handle("close-second-screen", () => {
-  if (secondWin && !secondWin.isDestroyed()) {
-    secondWin.close();
-  }
+  for (const w of outputWindows()) w.close();
   return { success: true };
 });
 
@@ -1855,6 +1984,16 @@ app.whenReady().then(() => {
   createMainWindow();
   setupAutoUpdater();
   setTimeout(() => checkForUpdates(false), 5000);  // 시작 직후 부담을 줄이려 5초 뒤 확인
+
+  // 모니터 연결·해제: 빠진 모니터의 송출 창은 닫고(남은 모니터로 옮겨 와 조작창을 덮지 않게) 조작창에 목록을 알린다.
+  // 송출 중에 새로 연결된 모니터에 송출 창을 열지는 조작창이 정한다 (모니터마다 송출을 켜고 끈 설정이 조작창에 있다)
+  screen.on("display-removed", (e, d) => {
+    const w = liveOutWin(d.id);
+    if (w) w.close();
+    notifyOutputDisplays();
+  });
+  screen.on("display-added", notifyOutputDisplays);
+  screen.on("display-metrics-changed", notifyOutputDisplays);
 
   // macOS: 독에서 앱 아이콘 클릭 시 창이 모두 닫혀 있으면 새 창 생성
   app.on("activate", () => {

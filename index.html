@@ -700,7 +700,9 @@ pointer-events:all;
 #addTbPanel{position:fixed;z-index:300;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px 22px;width:340px;max-width:96vw;box-shadow:0 8px 40px rgba(0,0,0,.6);display:none;}
 #addTbPanel.show{display:block;}
 
-/* ── 배경 컨트롤 패널: 송출 화면의 배경을 바로 바꾸고 밝기를 조절 (편집 미리보기는 그대로) ──
+/* ── 프로젝터 설정 패널 (툴바 [프로젝터] 버튼) ──
+   [배경] 탭 = 배경 컨트롤: 송출 화면의 배경을 바로 바꾸고 밝기를 조절 (편집 미리보기는 그대로)
+   [화면 자르기] 탭: 송출 화면의 가장자리를 원하는 만큼 자른다
    떠 있는 창: 가로로 긴 모양 [미리보기 | 1~9·0 칸 | 정보·밝기·전환] → 편집 화면을 적게 가린다
    오른쪽 패널에 넣으면(.docked) 같은 내용을 세로로 쌓는다 */
 #liveBgBtn .lbBadge{display:none;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--red);color:#fff;font-size:12px;font-weight:700;line-height:18px;text-align:center;}
@@ -710,6 +712,16 @@ pointer-events:all;
 #liveBgPanel.show{display:block;}
 .lbHead{display:flex;align-items:center;gap:8px;padding:5px 8px 5px 14px;border-bottom:1px solid var(--border2);cursor:move;touch-action:none;}
 .lbTitle{font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;}
+/* 탭과 송출 상태: 떠 있을 때는 제목 줄에 그대로 늘어서고, 오른쪽 패널 안에서는 둘째 줄로 내려간다 */
+.lbHeadSub{display:contents;}
+.lbTabs{display:flex;gap:2px;padding:2px;border:1px solid var(--border);border-radius:7px;background:var(--bg);flex-shrink:0;}
+.lbTab{height:24px;padding:0 11px;border:none;border-radius:5px;background:transparent;color:var(--text-dim);font-size:13px;font-family:'Noto Sans KR',sans-serif;cursor:pointer;white-space:nowrap;}
+.lbTab:hover{color:var(--text);}
+.lbTab.on{background:var(--accent);color:#fff;font-weight:600;}
+/* 화면 자르기를 쓰는 중이면 탭 이름 옆에 점 */
+.lbTabDot{display:none;width:6px;height:6px;margin-left:5px;border-radius:50%;background:var(--accent-txt);vertical-align:middle;}
+.lbTab.on .lbTabDot{background:#fff;}
+#liveBgPanel.cropOn .lbTabDot{display:inline-block;}
 .lbState{margin-left:auto;display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted);white-space:nowrap;}
 .lbState.on{color:var(--red);font-weight:600;}
 .lbState.on::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--red);}
@@ -729,7 +741,26 @@ pointer-events:all;
 .lbPvTextFrame{position:absolute;left:0;top:0;transform-origin:0 0;}
 .lbPvTextFrame *{pointer-events:none!important;}
 .lbPvEmpty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--text-muted);}
-.lbPvTag{position:absolute;left:6px;top:6px;z-index:5;padding:2px 8px;border-radius:10px;background:rgba(0,0,0,.6);color:#fff;font-size:12px;font-weight:600;white-space:nowrap;}
+.lbPvTag{position:absolute;left:6px;top:6px;z-index:5;padding:2px 8px;border-radius:10px;background:rgba(0,0,0,.6);color:#fff;font-size:12px;font-weight:600;white-space:nowrap;pointer-events:none;}
+#liveBgPanel.tab-crop .lbPvTag{display:none;}
+/* 화면 자르기: 미리보기도 송출 화면처럼 잘린 곳(빗금)을 덮고, 줄여 넣기면 슬라이드(.lbPvScreen)를 남은 곳에 맞게 줄인다.
+   [화면 자르기] 탭에서는 남은 곳의 테두리(점선)와 끌 수 있는 손잡이를 보인다 */
+.lbPvScreen{position:absolute;inset:0;transform-origin:0 0;}
+.pcShade{position:absolute;inset:0;z-index:3;pointer-events:none;}
+.pcCut{position:absolute;display:none;background:repeating-linear-gradient(135deg,rgba(255,255,255,.09) 0 2px,transparent 2px 7px),rgba(0,0,0,.74);}
+.pcFrame{position:absolute;z-index:4;display:none;outline:1px dashed var(--accent-txt);pointer-events:none;}
+#liveBgPanel.tab-crop .pcFrame{display:block;}
+.pcHandle{position:absolute;pointer-events:auto;touch-action:none;}
+.pcHandle[data-e=t],.pcHandle[data-e=b]{left:0;right:0;height:12px;cursor:ns-resize;}
+.pcHandle[data-e=t]{top:-6px;}
+.pcHandle[data-e=b]{bottom:-6px;}
+.pcHandle[data-e=l],.pcHandle[data-e=r]{top:0;bottom:0;width:12px;cursor:ew-resize;}
+.pcHandle[data-e=l]{left:-6px;}
+.pcHandle[data-e=r]{right:-6px;}
+.pcHandle::after{content:'';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border-radius:2px;background:var(--accent-txt);box-shadow:0 0 0 1px rgba(0,0,0,.6);}
+.pcHandle[data-e=t]::after,.pcHandle[data-e=b]::after{width:24px;height:4px;}
+.pcHandle[data-e=l]::after,.pcHandle[data-e=r]::after{width:4px;height:24px;}
+.pcHandle:hover::after,.pcHandle.drag::after{background:#fff;}
 .lbPv.prev .lbPvTag{background:var(--accent);}
 .lbPv.live .lbPvTag{background:var(--red);}
 .lbInfo{grid-area:info;display:flex;align-items:center;gap:8px;}
@@ -778,10 +809,81 @@ pointer-events:all;
 .lbFoot{grid-area:foot;display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;font-size:13px;color:var(--text-dim);}
 .lbFoot select{height:28px;padding:0 6px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:13px;font-family:'Noto Sans KR',sans-serif;}
 .lbHint{font-size:12px;color:var(--text-muted);line-height:1.5;}
+/* 탭마다 보이는 칸: [배경] 탭은 미리보기·칸·정보·밝기·전환, [화면 자르기] 탭은 미리보기·자를 만큼·방식 */
+#liveBgPanel.tab-crop .lbBgOnly,#liveBgPanel:not(.tab-crop) .lbCropOnly{display:none!important;}
+/* 위·아래·왼쪽·오른쪽: 슬라이더 + 숫자(%) */
+.pcEdges{grid-area:edges;align-self:center;display:flex;flex-direction:column;gap:6px;}
+.pcRow{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-dim);}
+.pcLbl{width:40px;flex-shrink:0;white-space:nowrap;}
+.pcRow input[type=range]{flex:1;min-width:0;accent-color:var(--accent);cursor:pointer;}
+.pcNum{width:58px;height:26px;flex-shrink:0;padding:0 7px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:13px;font-family:'DM Mono',monospace;text-align:right;}
+.pcNum:focus{outline:none;border-color:var(--accent);}
+/* 위아래 화살표 단추는 숨긴다 ('12.5'가 잘리지 않게). 방향키로는 0.1씩 바뀐다 */
+.pcNum::-webkit-inner-spin-button,.pcNum::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
+.pcUnit{width:12px;flex-shrink:0;font-size:12px;color:var(--text-muted);}
+/* 켜기·초기화, 잘라 내기 / 줄여 넣기, 설명 */
+.pcSide{grid-area:side;display:flex;flex-direction:column;gap:8px;font-size:13px;color:var(--text-dim);}
+.pcTop{display:flex;align-items:center;gap:8px;}
+.pcOn{flex:1;display:flex;align-items:center;gap:6px;color:var(--text);cursor:pointer;white-space:nowrap;}
+.pcOn input{width:15px;height:15px;margin:0;accent-color:var(--accent);cursor:pointer;}
+.pcMode{display:flex;align-items:center;gap:8px;white-space:nowrap;}
+.pcModeBtns{flex:1;display:flex;gap:2px;padding:2px;border:1px solid var(--border);border-radius:6px;background:var(--bg);}
+.pcModeBtn{flex:1;height:24px;padding:0 6px;border:none;border-radius:4px;background:transparent;color:var(--text-dim);font-size:13px;font-family:'Noto Sans KR',sans-serif;cursor:pointer;white-space:nowrap;}
+.pcModeBtn:hover{color:var(--text);}
+.pcModeBtn.on{background:var(--surface2);color:var(--text);font-weight:600;box-shadow:inset 0 0 0 1px var(--accent);}
+.pcDesc{font-size:12px;color:var(--text-dim);line-height:1.5;word-break:keep-all;}
+.pcSide .lbHint{word-break:keep-all;}
+/* 송출 화면 칸: 송출할 수 있는 모니터마다 [☑ 번호 이름 해상도 •] — 누르면 그 화면의 자르기를 아래에서 고친다.
+   체크(화면이 둘 이상일 때만): 그 화면에 송출할지. 번호가 빨가면 지금 송출 중, 점은 자르기 사용 중 */
+.pcOuts{grid-area:outs;display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;padding-bottom:8px;border-bottom:1px solid var(--border2);}
+.pcOuts.none{display:none;}
+.pcOutsLbl{font-size:13px;color:var(--text-dim);white-space:nowrap;}
+.pcOutList{display:contents;}
+.pcOut{display:inline-flex;align-items:center;gap:6px;max-width:280px;height:30px;padding:0 10px 0 7px;border:1px solid var(--border);border-radius:7px;background:var(--surface2);color:var(--text);font-size:13px;cursor:pointer;}
+.pcOut:hover{border-color:var(--accent);}
+.pcOut.on{border-color:var(--accent);background:rgba(124,107,255,.18);box-shadow:inset 0 0 0 1px var(--accent);}
+.pcOutChk{width:15px;height:15px;margin:0;flex-shrink:0;accent-color:var(--accent);cursor:pointer;}
+.pcOutNum{flex-shrink:0;min-width:18px;height:18px;padding:0 4px;border-radius:4px;background:var(--border);color:var(--text);font-size:12px;font-weight:700;line-height:18px;text-align:center;}
+.pcOut.live .pcOutNum{background:var(--red);color:#fff;}
+.pcOutName{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.pcOut.on .pcOutName{font-weight:600;}
+.pcOutRes{flex-shrink:0;font-size:11px;color:var(--text-muted);font-family:'DM Mono',monospace;}
+.pcOutDot{display:none;flex-shrink:0;width:6px;height:6px;border-radius:50%;background:var(--accent-txt);}
+.pcOut.crop .pcOutDot{display:inline-block;}
+/* 송출하지 않는 화면: 흐리게 (자르기는 그대로 고칠 수 있다) */
+.pcOut.off .pcOutNum,.pcOut.off .pcOutName,.pcOut.off .pcOutRes{opacity:.45;}
+.pcOutsHint{font-size:12px;color:var(--text-muted);word-break:keep-all;}
+.pcOutsHint:empty{display:none;}
+/* 저장된 자르기: 이름 칩을 누르면 그 값으로 바로 자른다. [＋ 저장]은 이름 붙여 저장 (지금 이름이면 덮어쓰기) */
+#liveBgPanel.tab-crop .lbBody{grid-template-areas:"outs outs outs" "pv edges side" "presets presets presets";grid-template-rows:auto auto auto;}
+.pcPresets{grid-area:presets;display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding-top:8px;border-top:1px solid var(--border2);}
+.pcPresetsLbl{margin-right:2px;font-size:13px;color:var(--text-dim);white-space:nowrap;}
+.pcChips{display:contents;}
+.pcPresetsEmpty{font-size:12px;color:var(--text-muted);white-space:nowrap;}
+.pcChip{display:inline-flex;align-items:center;gap:5px;max-width:220px;height:28px;padding:0 3px 0 11px;border:1px solid var(--border);border-radius:14px;background:var(--surface2);color:var(--text);font-size:13px;cursor:pointer;}
+.pcChip:hover{border-color:var(--accent);}
+.pcChip.on{border-color:var(--accent);background:rgba(124,107,255,.18);color:var(--accent-txt);font-weight:600;}
+.pcChipName{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+/* 불러온 뒤 값을 바꿨으면 '바뀜' ([＋ 저장] → 덮어쓰기로 저장할 수 있다) */
+.pcChipMod{flex-shrink:0;padding:0 5px;border-radius:7px;background:rgba(255,255,255,.08);color:var(--text-dim);font-size:11px;font-weight:400;line-height:16px;white-space:nowrap;}
+.pcChipDel{flex-shrink:0;min-width:22px;height:22px;padding:0;border:none;border-radius:11px;background:transparent;color:var(--text-muted);font-size:15px;font-family:'Noto Sans KR',sans-serif;line-height:1;cursor:pointer;}
+.pcChipDel:hover{color:var(--red);}
+/* ✕를 한 번 누르면 빨간 [삭제] — 한 번 더 누르면 지운다 */
+.pcChip.arm{border-color:var(--red);}
+.pcChip.arm .pcChipDel{padding:0 8px;background:var(--red);color:#fff;font-size:12px;font-weight:600;}
+.pcSaveBtn{height:28px;padding:0 11px;border:1px dashed var(--border);border-radius:14px;background:transparent;color:var(--text-dim);font-size:13px;font-family:'Noto Sans KR',sans-serif;cursor:pointer;white-space:nowrap;}
+.pcSaveBtn:hover,.pcSaveBtn.open{border-style:solid;border-color:var(--accent);color:var(--text);}
+/* 이름 붙여 저장 창 (레이아웃 저장 창과 같은 모양) */
+.pcSaveNote{display:none;font-size:12px;color:var(--accent-txt);line-height:1.4;}
+.pcSaveNote.show{display:block;}
 /* 오른쪽 패널 맨 위에 넣었을 때: 다른 칸(.rpsec)처럼 보이고 내용은 세로로 */
 #liveBgPanel.docked{position:static;z-index:auto;width:auto;max-height:none;overflow:visible;flex-shrink:0;background:transparent;border:none;border-bottom:1px solid var(--border2);border-radius:0;box-shadow:none;}
-#liveBgPanel.docked .lbHead{padding:8px 8px 6px 14px;border-bottom:none;cursor:grab;}
+#liveBgPanel.docked .lbHead{padding:8px 8px 6px 14px;border-bottom:none;cursor:grab;flex-wrap:wrap;row-gap:6px;}
 #liveBgPanel.docked .lbTitle{font-size:11px;letter-spacing:1.2px;color:rgba(255,255,255,.9);}
+/* 첫째 줄 [제목 … 밖으로 빼기 ✕], 둘째 줄 [배경 | 화면 자르기 … 송출 상태] */
+#liveBgPanel.docked .lbDock{margin-left:auto;}
+#liveBgPanel.docked .lbHeadSub{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;order:3;flex-basis:100%;}
+#liveBgPanel.docked .pcEdges{align-self:stretch;}
 #liveBgPanel.docked .lbBody{display:flex;flex-direction:column;align-items:stretch;gap:8px;padding:0 14px 12px;}
 /* 떠 있는 패널을 끌어 오른쪽 패널 위에 가져가면 보이는 안내 */
 /* 끄는 패널이 가운데를 덮으므로 글씨는 위쪽에 */
@@ -898,11 +1000,11 @@ pointer-events:all;
         <span id="liveLbl">LIVE</span>
         <span id="liveTimer">00:00:00</span>
       </div>
-      <button class="tb" id="liveBgBtn" onclick="toggleLiveBgPanel()" title="배경 컨트롤 · 숫자키 한 번: 미리보기, 한 번 더: 송출 (0: 원래 배경)">
+      <button class="tb" id="liveBgBtn" onclick="toggleLiveBgPanel()" title="프로젝터 설정 · 배경 컨트롤(숫자키 한 번: 미리보기, 한 번 더: 송출, 0: 원래 배경)과 화면 자르기">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="1.5" y="2" width="11" height="10" rx="1.2"/><circle cx="5" cy="5.5" r="1.1"/><path d="M12.5 9.5L9.5 6.5L3.5 12"/>
+          <rect x="1" y="3.5" width="12" height="7" rx="1.2"/><circle cx="9.3" cy="7" r="1.7"/><path d="M3.5 6h2.2"/><path d="M3 10.5v1.5"/><path d="M11 10.5v1.5"/>
         </svg>
-        배경
+        프로젝터
         <span class="lbBadge" id="liveBgBadge"></span>
       </button>
       <button class="tb" onclick="openScreen()">
@@ -1123,37 +1225,55 @@ pointer-events:all;
     </div>
   </div>
 
-  <!-- 배경 컨트롤 패널: 송출 화면의 배경만 바꾼다 (슬라이드·프로젝트 데이터와 편집 미리보기는 그대로)
+  <!-- 프로젝터 설정 패널 (툴바 [프로젝터] 버튼)
+       [배경] 배경 컨트롤: 송출 화면의 배경만 바꾼다 (슬라이드·프로젝트 데이터와 편집 미리보기는 그대로)
+       [화면 자르기] 송출 화면의 가장자리를 원하는 만큼 자른다
        떠 있는 창으로 쓰거나 오른쪽 패널 맨 위에 넣어 쓸 수 있다 ([오른쪽에 넣기] / [밖으로 빼기], 제목 줄 끌기) -->
   <div id="liveBgPanel">
     <div class="lbHead" id="lbHead">
-      <span class="lbTitle">배경 컨트롤</span>
-      <span class="lbState" id="lbState">송출 전</span>
+      <span class="lbTitle">프로젝터 설정</span>
+      <div class="lbHeadSub">
+        <div class="lbTabs" role="tablist">
+          <button class="lbTab" id="lbTabBg" type="button" role="tab" onclick="setProjTab('bg');this.blur()" title="배경 컨트롤 · 숫자키 한 번: 미리보기, 한 번 더: 송출 (0: 원래 배경)">배경</button>
+          <button class="lbTab" id="lbTabCrop" type="button" role="tab" onclick="setProjTab('crop');this.blur()" title="송출 화면의 가장자리를 원하는 만큼 자르기">화면 자르기<span class="lbTabDot"></span></button>
+        </div>
+        <span class="lbState" id="lbState">송출 전</span>
+      </div>
       <button class="lbDock" id="lbDockBtn" type="button" onclick="toggleLiveBgDock();this.blur()">오른쪽에 넣기</button>
       <button class="lbClose" type="button" onclick="closeLiveBgPanel()" title="닫기">✕</button>
     </div>
     <div class="lbBody">
+      <!-- 송출 화면: 모니터마다 자르기가 따로다. 고를 화면을 누르고, 체크를 끄면 그 화면에는 송출하지 않는다 -->
+      <div class="pcOuts lbCropOnly" id="pcOuts">
+        <span class="pcOutsLbl">송출 화면</span>
+        <div class="pcOutList" id="pcOutList"></div>
+        <span class="pcOutsHint" id="pcOutsHint"></span>
+      </div>
       <div class="lbPv" id="lbPv">
-        <div class="lbPvMedia" id="lbPvMedia"></div>
-        <div class="lbPvText" id="lbPvText"></div>
+        <div class="lbPvScreen" id="lbPvScreen">
+          <div class="lbPvMedia" id="lbPvMedia"></div>
+          <div class="lbPvText" id="lbPvText"></div>
+        </div>
+        <div class="pcShade"><i class="pcCut" data-e="t"></i><i class="pcCut" data-e="b"></i><i class="pcCut" data-e="l"></i><i class="pcCut" data-e="r"></i></div>
+        <div class="pcFrame" id="pcFrame"><i class="pcHandle" data-e="t" title="끌어서 위 자르기"></i><i class="pcHandle" data-e="b" title="끌어서 아래 자르기"></i><i class="pcHandle" data-e="l" title="끌어서 왼쪽 자르기"></i><i class="pcHandle" data-e="r" title="끌어서 오른쪽 자르기"></i></div>
         <span class="lbPvTag" id="lbPvTag"></span>
       </div>
-      <div class="lbInfo">
+      <div class="lbInfo lbBgOnly">
         <div class="lbInfoTxt">
           <span class="lbInfoMain" id="lbInfoMain"></span>
           <span class="lbInfoSub" id="lbInfoSub"></span>
         </div>
         <button class="tb pri lbTake" id="lbTakeBtn" type="button" onclick="takeLiveBg();this.blur()">▶ 송출</button>
       </div>
-      <div class="lbBright">
+      <div class="lbBright lbBgOnly">
         <span>밝기</span>
         <input type="range" id="lbBright" min="0" max="150" step="1" value="100" list="lbBrightTicks" title="미리보기 중인 배경의 밝기 (더블클릭: 100%)">
         <span class="lbBrightVal" id="lbBrightVal">100%</span>
         <button class="lbBrightReset" id="lbBrightReset" type="button" onclick="resetLiveBgBrightness();this.blur()" title="원래 밝기(100%)로 부드럽게 되돌리기">원래 밝기</button>
         <datalist id="lbBrightTicks"><option value="100"></option></datalist>
       </div>
-      <div class="lbGrid" id="lbGrid"></div>
-      <div class="lbFoot">
+      <div class="lbGrid lbBgOnly" id="lbGrid"></div>
+      <div class="lbFoot lbBgOnly">
         <span>전환</span>
         <select id="lbFade" title="배경을 송출할 때 바뀌는 시간">
           <option value="0">즉시</option>
@@ -1163,10 +1283,51 @@ pointer-events:all;
         </select>
         <span class="lbHint">숫자키 한 번: 미리보기 · 한 번 더: 송출</span>
       </div>
+      <!-- 화면 자르기: 위·아래·왼쪽·오른쪽에서 자를 만큼 (슬라이드 크기의 %) -->
+      <div class="pcEdges lbCropOnly" id="pcEdges">
+        <div class="pcRow"><span class="pcLbl">위</span><input type="range" id="pcR_t" data-e="t" min="0" max="90" step="0.1" value="0"><input type="number" class="pcNum" id="pcN_t" data-e="t" min="0" max="90" step="0.1" value="0"><span class="pcUnit">%</span></div>
+        <div class="pcRow"><span class="pcLbl">아래</span><input type="range" id="pcR_b" data-e="b" min="0" max="90" step="0.1" value="0"><input type="number" class="pcNum" id="pcN_b" data-e="b" min="0" max="90" step="0.1" value="0"><span class="pcUnit">%</span></div>
+        <div class="pcRow"><span class="pcLbl">왼쪽</span><input type="range" id="pcR_l" data-e="l" min="0" max="90" step="0.1" value="0"><input type="number" class="pcNum" id="pcN_l" data-e="l" min="0" max="90" step="0.1" value="0"><span class="pcUnit">%</span></div>
+        <div class="pcRow"><span class="pcLbl">오른쪽</span><input type="range" id="pcR_r" data-e="r" min="0" max="90" step="0.1" value="0"><input type="number" class="pcNum" id="pcN_r" data-e="r" min="0" max="90" step="0.1" value="0"><span class="pcUnit">%</span></div>
+      </div>
+      <div class="pcSide lbCropOnly">
+        <div class="pcTop">
+          <label class="pcOn" title="끄면 자른 값은 그대로 두고 송출 화면만 원래대로 보입니다"><input type="checkbox" id="pcOn" checked>자르기 사용</label>
+          <button class="lbBrightReset" type="button" onclick="resetOutputCrop();this.blur()" title="위·아래·왼쪽·오른쪽을 모두 0%로">초기화</button>
+        </div>
+        <div class="pcMode">
+          <span>슬라이드</span>
+          <div class="pcModeBtns">
+            <button class="pcModeBtn" id="pcModeCut" type="button" onclick="setOutputCropFit(false);this.blur()" title="슬라이드는 그대로 두고 잘린 가장자리만 검게">잘라 내기</button>
+            <button class="pcModeBtn" id="pcModeFit" type="button" onclick="setOutputCropFit(true);this.blur()" title="슬라이드 전체를 남은 곳에 맞게 줄이기">줄여 넣기</button>
+          </div>
+        </div>
+        <div class="pcDesc" id="pcDesc"></div>
+        <span class="lbHint">미리보기의 점선을 끌어도 됩니다</span>
+      </div>
+      <!-- 저장된 자르기: 칩을 누르면 그 값으로 자르고, [＋ 저장]으로 이름 붙여 저장·덮어쓰기 -->
+      <div class="pcPresets lbCropOnly">
+        <span class="pcPresetsLbl">저장된 자르기</span>
+        <div class="pcChips" id="pcChips"></div>
+        <button class="pcSaveBtn" id="pcSaveBtn" type="button" onclick="openCropSavePopup();this.blur()" title="지금 자르기 값을 이름 붙여 저장 (지금 쓰는 이름이면 덮어쓰기)">＋ 저장</button>
+      </div>
       <input type="file" id="lbFile" accept="image/*,video/*" style="display:none;">
     </div>
   </div>
   <div id="lbDockHint">여기에 놓으면<br>오른쪽 패널에 들어갑니다</div>
+  <!-- 화면 자르기 이름 붙여 저장: 지금 이름 덮어쓰기 / 새 이름으로 저장 (같은 이름을 치면 덮어쓰기) -->
+  <div class="layoutNamePopup" id="pcSavePopup">
+    <div class="lnpOverwriteRow" id="pcSaveOverRow">
+      <button class="lnpOverwriteBtn" id="pcSaveOverBtn" type="button" onclick="confirmOverwriteCropPreset()"></button>
+    </div>
+    <div class="lnpDivider" id="pcSaveDivider">새 이름으로 저장</div>
+    <div class="lnpNameRow">
+      <input type="text" id="pcSaveName" maxlength="30" placeholder="이름 (예: 본당 프로젝터)" autocomplete="off">
+      <button class="lnpOk" id="pcSaveOk" type="button" onclick="confirmSaveCropPreset()">저장</button>
+      <button class="lnpCancel" type="button" onclick="closeCropSavePopup()" title="닫기">✕</button>
+    </div>
+    <div class="pcSaveNote" id="pcSaveNote"></div>
+  </div>
 
   <div class="workspace" id="workspace">
     <div class="sidebar" id="sidebar">
@@ -3657,6 +3818,34 @@ function _pvMediaKey(sl){
   return `${src}|${sl.mediaOffX??50}|${sl.mediaOffY??50}|${sl.mediaScale??100}|${sl.mediaFit||'cover'}|${sl.mediaLoop!==false}|${sl.mediaAutoPlay!==false}|${sl.mediaLoopMode||'normal'}|${sl.mediaLoopFade??1}`;
 }
 
+// ── 송출 중 편집 미리보기의 새 영상은 송출 화면의 전환이 끝난 뒤 연다 ──
+// 편집 미리보기도 송출 화면과 같은 그래픽 칩으로 영상을 디코딩한다. 송출 화면이 두 영상을 겹쳐 페이드하는 동안
+// 미리보기가 새 영상을 열면(파일 읽기·디코더 만들기·첫 화면 디코딩) 송출 화면의 영상과 페이드가 끊긴다.
+// (영상 36개 프로젝트: 전환마다 송출 화면이 멈칫한 횟수 3.5회 → 미리보기 영상을 끄면 1.4회)
+// 그래서 그동안은 썸네일을 포스터로 보여 주고, 송출 화면의 페이드가 끝난 뒤 재생을 시작한다.
+// 늦게 시작한 만큼은 송출 영상 싱크(_applyOutVideoState)가 재생 속도로 따라잡는다.
+let _pvVidHoldUntil=0;   // 이 시각(Date.now)까지 미리보기는 새 영상을 열지 않는다 (syncScreen이 송출 전환 시간만큼 정한다)
+let _pvOutKey='';        // 마지막으로 송출한 배경 영상의 키 (바뀔 때만 기다린다)
+
+/** 지금 편집 미리보기가 새 영상을 열기 전에 기다릴 시간(ms). 송출 중이 아니면 0 */
+function _previewVideoHoldMs(){
+  return screenOpen?Math.max(0,_pvVidHoldUntil-Date.now()):0;
+}
+
+/** 새 영상(preload=none)을 썸네일 포스터로 보여 두었다가 송출 화면의 전환이 끝나면 재생한다 */
+function _holdPreviewVideo(v,url){
+  v.dataset.held='1';
+  const th=_videoThumbs.get(url);
+  if(th) v.poster=th;
+  setTimeout(()=>{
+    delete v.dataset.held;
+    if(!v.isConnected||!v.getAttribute('src')) return;
+    v.preload='auto';
+    v.autoplay=true;
+    v.play().catch(()=>{});
+  },_previewVideoHoldMs()+20);
+}
+
 /** 배경 영상을 완전히 내려 디코더를 바로 돌려준다 (그냥 떼어 내면 한동안 남아 송출 화면 몫의 디코더까지 잡아먹는다) */
 function _unloadPreviewVideos(el){
   if(!el) return;
@@ -3813,11 +4002,14 @@ function fillL(L, sl){
         if(L===showL){ _addBgInteraction(i,sl,medEl); _addBgCornerHandles(sl,medEl); }
       }else{
         const v=document.createElement('video');
+        const _previewAutoPlay=sl.mediaAutoPlay!==false;
+        // 송출 화면이 이 영상으로 전환하는 동안에는 열지 않고 썸네일만 보여 준다 (_holdPreviewVideo)
+        const _hold=_previewAutoPlay&&_previewVideoHoldMs()>0;
+        if(_hold) v.preload='none';
         v.src=sl.mediaURL;
         v.muted=true;
         v.loop=sl.mediaLoop!==false;
-        const _previewAutoPlay=sl.mediaAutoPlay!==false;
-        v.autoplay=_previewAutoPlay;
+        v.autoplay=_previewAutoPlay&&!_hold;
         if(!_previewAutoPlay){
           // 클릭 시 재생: 편집 미리보기도 멈추고 클릭 대기
           v.addEventListener('click',()=>{
@@ -3833,6 +4025,7 @@ function fillL(L, sl){
         // 편집 미리보기는 보통 반복에 브라우저 기본 반복을 쓴다 (영상 디코더를 하나만 써서 송출 화면 몫을 남긴다)
         if(window.VideoLoop) VideoLoop.attach(v,{loop:sl.mediaLoop!==false, mode:sl.mediaLoopMode, fade:sl.mediaLoopFade,
           seamless:false, isFollower:()=>_isPreviewFollowingOut(v)});
+        if(_hold) _holdPreviewVideo(v,sl.mediaURL);
       }
     }
   } else if(L===showL && sl.mediaURL && sl.mediaType==='image'){
@@ -3870,7 +4063,9 @@ function _updatePreviewGroupBg(sl, fd){
   if(!window.GroupBgLayer) return;
   const el=document.getElementById('GBG');
   if(!el) return;
-  if(!_gbgPreview) _gbgPreview=GroupBgLayer.create(el,{seamless:false, isFollower:v=>_isPreviewFollowingOut(v)});
+  if(!_gbgPreview) _gbgPreview=GroupBgLayer.create(el,{seamless:false, isFollower:v=>_isPreviewFollowingOut(v),
+    // 송출 화면이 이 영상으로 전환하는 동안에는 열지 않고 썸네일만 보여 준다 (_previewVideoHoldMs)
+    holdMs:()=>_previewVideoHoldMs(), posterOf:url=>_videoThumbs.get(url)||''});
   const spec=sl?groupVideoSpecOf(sl):null;
   // 편집 미리보기는 항상 음소거 (소리는 송출 화면에서만)
   if(spec) _gbgPreview.show({...spec,audio:false}, fd);
@@ -3931,7 +4126,8 @@ function showSlide(sl, fade){
   cur.style.opacity='1';
   const pending={cur, fd:slideFd, started:false};
   _pvFadePending=pending;
-  const incoming=[...nxt.querySelectorAll('.lmedia img, .lmedia video:not([data-loop-twin])')];
+  // 송출 전환이 끝날 때까지 열지 않는 영상(포스터만 보임)은 기다리지 않는다
+  const incoming=[...nxt.querySelectorAll('.lmedia img, .lmedia video:not([data-loop-twin]):not([data-held])')];
   const gbgVid=(_gbgPreview&&_gbgPreview.active())?_gbgPreview.video():null;
   if(gbgVid&&gbgVid!==prevGbg) incoming.push(gbgVid);
   const ready=(window.VideoLoop&&VideoLoop.whenReady)?VideoLoop.whenReady(incoming,700):Promise.resolve();
@@ -4845,7 +5041,7 @@ function toast(msg){
   if(!t){t=document.createElement('div');t.id='toast';t.style.cssText='position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;padding:8px 18px;border-radius:20px;font-size:14px;z-index:999;pointer-events:none;font-family:"Noto Sans KR",sans-serif;transition:opacity .3s;';document.body.appendChild(t);}
   t.textContent=msg;t.style.bottom=_toastBottom()+'px';t.style.opacity='1';clearTimeout(t._t);t._t=setTimeout(()=>t.style.opacity='0',2200);
 }
-/** 알림 위치(아래에서 px). 떠 있는 배경 컨트롤이 그 자리를 덮고 있으면 패널 위로 올린다 */
+/** 알림 위치(아래에서 px). 떠 있는 프로젝터 설정 패널이 그 자리를 덮고 있으면 패널 위로 올린다 */
 function _toastBottom(){
   const p=document.getElementById('liveBgPanel');
   if(!p||!p.classList.contains('show')||p.classList.contains('docked')) return 70;
@@ -4882,28 +5078,36 @@ function stopLiveTimer(){
   document.getElementById('liveChip').classList.remove('on');
 }
 
+/**
+ * 송출 시작: 조작창이 없는 외부 모니터마다 송출 창을 하나씩 열어 같은 슬라이드를 함께 내보낸다.
+ * 프로젝터 설정 > 화면 자르기에서 송출을 꺼 둔 화면은 뺀다. 외부 모니터가 없으면 이 화면에 연다.
+ * 이미 송출 중이면 송출 창을 앞으로 가져오고, 빠진 화면이 있으면 마저 연다.
+ */
 function openScreen(){
-  if(!window.electronAPI || typeof window.electronAPI.openSecondScreen !== 'function'){
+  const api=window.electronAPI;
+  if(!api || typeof api.openSecondScreen !== 'function'){
     alert('Electron 외부 화면 API가 연결되어 있지 않습니다. preload.js를 확인해 주세요.');
     return;
   }
 
-  window.electronAPI.openSecondScreen().then(res => {
+  // 모니터 목록을 새로 받은 뒤 연다 (그사이 모니터를 꽂거나 조작창을 옮겼을 수 있다)
+  _outRefresh().then(()=>api.openSecondScreen({ids:_outWantIds(),start:true})).then(res => {
     if(res && res.success){
+      if(res.displays) _outSetList(res);
+      if(screenOpen) return;   // 이미 송출 중 (라이브 타이머 등은 그대로)
       screenOpen=true;
       document.body.classList.add('live');
       document.getElementById('sdot').classList.add('on');
       document.getElementById('slbl').textContent='연결됨';
+      _outRenderStatus();
       document.getElementById('stopScreenBtn').disabled=false;
       startLiveTimer();
       renderLiveBgUI();   // 배경 컨트롤의 '송출 중' 표시
       // 송출이 시작되면 왼쪽 목록에서 현재(빨간) 슬라이드를 한가운데로 스크롤한다.
       setTimeout(()=>scrollCurSlideIntoView(true), 60);
       // 송출 창이 준비 알림(screen-ready)으로 이미 화면을 받았으면 다시 보내지 않는다 (시작 페이드가 끊기지 않게)
-      setTimeout(()=>{ if(!_screenSyncedOnReady) syncScreen(); }, 600);
-      // 송출 시작 직후 프로젝트 내 모든 영상을 송출 화면에 미리 워밍시켜
-      // 이후 어떤 슬라이드로 이동해도 버벅이지 않게 한다.
-      setTimeout(prewarmAllVideos, 900);
+      // (곧 나올 영상 목록도 슬라이드 데이터에 함께 간다 — 송출 화면이 다음 영상 몇 개만 미리 준비한다)
+      setTimeout(()=>{ if(!_screenSyncedOnReady){ _pcSend(); syncScreen(); } }, 600);
     }
   }).catch(error => {
     console.error('외부 화면 열기 실패:', error);
@@ -4917,62 +5121,134 @@ function closeScreen(){
 }
 
 /**
- * 송출 시작 시 프로젝트 안의 모든 영상을 송출 화면으로 보내 사전 워밍(미리 디코딩)시킨다.
- * 같은 영상은 mId 기준으로 한 번만 보낸다.
- * 영상은 이제 file:// 짧은 경로이므로 한꺼번에 보내도 부담이 없다.
+ * 송출 화면에서 그 슬라이드의 배경으로 재생될 영상 { key, url } (없으면 null). 라이브·그룹 배경 영상이 우선.
+ * orig: 배경 컨트롤과 상관없이 슬라이드에 원래 지정된 배경의 영상
  */
-function prewarmAllVideos(){
-  if(!screenOpen || !window.electronAPI || typeof window.electronAPI.sendPrewarm!=='function') return;
-  try{
-    const f=getFlat();
-    if(!Array.isArray(f)||!f.length) return;
-    const seen=new Set();
-    const list=[];
-    for(const s of f){
-      if(!s||s.mediaType!=='video'||!s.mediaURL) continue;
-      const id=_getMediaId(s.mediaURL);
-      if(!id||seen.has(id)) continue;
-      seen.add(id);
-      list.push({ mId:id, mURL:s.mediaURL, mType:'video' });
-    }
-    // 배경 컨트롤 칸에 지정된 영상도 미리 디코딩해 두면 처음 송출할 때도 끊기지 않는다
-    for(let i=0;i<LIVE_BG_SLOTS;i++){
-      const sp=_lbSlotSpec(i);
-      if(!sp||sp.type!=='video') continue;
-      const id=_getMediaId(sp.url);
-      if(!id||seen.has(id)) continue;
-      seen.add(id);
-      list.push({ mId:id, mURL:sp.url, mType:'video' });
-    }
-    if(list.length) window.electronAPI.sendPrewarm(list);
-  }catch(e){ console.error('영상 사전 워밍 전송 실패:',e); }
+function _outVideoOf(s,orig){
+  if(!s) return null;
+  const gv=orig?groupVideoSpecOf(s):bgVideoSpecOf(s);
+  if(gv) return gv.key?{key:gv.key,url:gv.url}:null;
+  if(s.mediaType!=='video'||!s.mediaURL) return null;
+  const id=_getMediaId(s.mediaURL);
+  return id?{key:id,url:s.mediaURL}:null;
 }
 
-// 송출 화면이 수신 준비를 마치면 지금 화면을 처음부터 다시 보낸다.
+/**
+ * 송출 화면이 미리 준비해 둘 '곧 나올 영상' [{ key, url }] (앞일수록 먼저 쓰일 영상).
+ * 미리 보는 배경 컨트롤 칸(한 번 더 누르면 송출) → 다음 슬라이드들(그룹 끝이면 다음 그룹 첫 슬라이드) → 이전 슬라이드 순.
+ * 지금 송출 중인 영상은 빼고 같은 영상은 한 번만 넣는다. 송출 화면은 앞의 몇 개만 준비한다 (screen.html STANDBY_MAX).
+ * 프로젝트의 영상을 모두 준비시키지 않는 이유는 screen.html '대기 영상' 설명 참고.
+ */
+function _upcomingVideos(){
+  const f=getFlat();
+  const cur=f[curIdx];
+  if(!cur) return [];
+  const list=[], seen=new Set();
+  const add=v=>{ if(v&&!seen.has(v.key)){ seen.add(v.key); list.push(v); } };
+  const now=_outVideoOf(_withLiveBg(cur));
+  if(now) seen.add(now.key);
+  if(_lbPrev!=='orig'&&_lbPrev!==_lbEffLive()){
+    const sp=_lbSlotSpec(_lbPrev);
+    if(sp&&sp.type==='video') add({key:_getMediaId(sp.url),url:sp.url});
+  }
+  // 배경 컨트롤로 다른 배경을 송출 중이면, '0 원래 배경'으로 돌아올 때 슬라이드 영상이 멈춘 자리에서 바로 이어지게 남겨 둔다
+  if(_lbEffLive()!=='orig') add(_outVideoOf(cur,true));
+  const gi=getGroupIndexes(cur.groupId);
+  const pos=gi.indexOf(curIdx);
+  const ahead=pos>=0?gi.slice(pos+1,pos+9):[];
+  // 그룹(곡)의 남은 슬라이드 다음은 다음 그룹의 첫 슬라이드 — 곡 하나가 같은 영상이면 다음 곡 영상을 곡 처음부터 준비해 둔다
+  const g0=groups.findIndex(g=>g.id===cur.groupId);
+  for(let k=1;k<groups.length;k++){
+    const first=slides.find(s=>s.groupId===groups[(g0+k)%groups.length].id);
+    if(first){ ahead.push(getGlobalIndexBySlideId(first.id)); break; }
+  }
+  for(const i of ahead){
+    add(_outVideoOf(_withLiveBg(f[i])));
+    if(list.length>=2) break;
+  }
+  if(pos>0) add(_outVideoOf(_withLiveBg(f[gi[pos-1]])));
+  return list.slice(0,3);
+}
+
+/** 송출 화면에 보낼 주소: 파일 경로는 짧으니 매번, data URL은 처음 한 번만 (이후엔 키로 찾는다) */
+function _upURL(key,url){
+  if(!/^data:/i.test(url||'')) return url;
+  if(_screenSentMedia.has(key)) return null;
+  _screenSentMedia.add(key);
+  return url;
+}
+
+let _upSentKey='';   // 모든 송출 화면에 마지막으로 알린 '곧 나올 영상' (같으면 다시 보내지 않는다)
+/** 슬라이드 데이터에 넣을 곧 나올 영상 목록. to: 그 송출 화면에만 보낼 때 */
+function _upcomingPayload(to){
+  const up=_upcomingVideos();
+  if(to===undefined) _upSentKey=up.map(v=>v.key).join(',');
+  return up.map(v=>({key:v.key,url:_upURL(v.key,v.url)}));
+}
+
+/**
+ * 슬라이드는 그대로인데 곧 나올 영상이 바뀌었으면 송출 화면에 알린다 (배경 컨트롤 칸 미리보기, 송출 시작 등).
+ * to: 그 송출 화면(모니터 id)에만 (새로 열린 송출 화면 — 그때는 같아도 보낸다). 없으면 모든 송출 화면
+ */
+function _sendUpcoming(to){
+  if(!screenOpen || !window.electronAPI || typeof window.electronAPI.sendPrewarm!=='function') return;
+  try{
+    const key=_upcomingVideos().map(v=>v.key).join(',');
+    if(to===undefined&&key===_upSentKey) return;
+    window.electronAPI.sendPrewarm(_upcomingPayload(to), to);
+  }catch(e){ console.error('곧 나올 영상 알림 실패:',e); }
+}
+
+// 송출 화면이 수신 준비를 마치면 그 송출 화면에 지금 화면을 처음부터 다시 보낸다.
 // 송출 창이 늦게 뜨면(글꼴 로딩 등) 열 때 보낸 화면을 놓치는데, 배경 사진·영상 주소는 처음 한 번만
 // 보내므로(_screenSentMedia) 놓친 배경은 송출을 다시 켤 때까지 나오지 않았다. 그래서 보낸 기록부터 비운다.
+// (기록을 비우면 다음 슬라이드부터 주소를 모든 송출 화면에 다시 보낸다. 이미 받은 화면은 같은 주소라 그대로)
+// 송출 화면이 여럿이면 준비된 그 화면에만 보낸다 — 이미 송출 중인 화면의 시작 페이드나 지금 화면이 다시 그려지지 않게.
 let _screenSyncedOnReady=false;
 if(window.electronAPI && typeof window.electronAPI.onScreenReady === 'function'){
-  window.electronAPI.onScreenReady(()=>{
+  window.electronAPI.onScreenReady((msg)=>{
+    const to=(msg&&msg.id!=null)?String(msg.id):undefined;
     const resend=()=>{
       _screenSyncedOnReady=true;
       _screenSentMedia.clear();
-      syncScreen();
-      setTimeout(prewarmAllVideos, 300);
+      _pcSend(to);    // 화면 자르기를 첫 화면보다 먼저 (잘리지 않은 화면이 잠깐 보이지 않게)
+      if(isBlank && typeof window.electronAPI.blankScreen==='function') window.electronAPI.blankScreen(true, to);
+      syncScreen(to);   // 곧 나올 영상 목록도 함께 간다
     };
-    if(screenOpen) resend();
-    else setTimeout(()=>{ if(screenOpen) resend(); }, 300);
+    // 모르는 송출 화면이면 모니터 목록부터 새로 받는다 (그 화면의 자르기 값을 찾으려고)
+    const go=()=>{ if(to!==undefined&&!_pcCur.has(to)) _outRefresh().then(resend); else resend(); };
+    if(screenOpen) go();
+    else setTimeout(()=>{ if(screenOpen) go(); }, 300);
   });
 }
 
-// 송출 화면이 닫히면 UI 상태를 '연결 안됨'으로 초기화
+// 모니터 연결·해제, 송출 창 열기·닫기: 송출 화면 목록을 고친다.
+// 송출 중에 외부 모니터가 새로 연결되면 (송출을 꺼 둔 화면이 아니면) 그 화면에도 송출 창을 연다.
+if(window.electronAPI && typeof window.electronAPI.onOutputDisplays === 'function'){
+  window.electronAPI.onOutputDisplays((info)=>{
+    _outSetList(info);
+    if(!screenOpen) return;
+    const open=new Set(_outDisplays.filter(d=>d.open).map(d=>d.id));
+    const missing=_outWantIds().filter(id=>!open.has(id));
+    const key=missing.join(',');
+    if(!missing.length||key===_outAutoKey){ _outAutoKey=key; return; }
+    _outAutoKey=key;   // 열기에 실패해도 같은 화면을 거듭 열려고 하지 않는다
+    _outSync();
+  });
+}
+
+// 송출 화면이 모두 닫히면 UI 상태를 '연결 안됨'으로 초기화
 if(window.electronAPI && typeof window.electronAPI.onSecondScreenClosed === 'function'){
   window.electronAPI.onSecondScreenClosed(()=>{
     screenOpen=false;
     _screenSyncedOnReady=false;
+    _outAutoKey='';
     document.body.classList.remove('live');
     isBlank=false;
     _screenSentMedia.clear(); // 새 screen.html 세션엔 캐시가 없으므로 초기화
+    _upSentKey='';
+    _pvOutKey='';
+    _pvVidHoldUntil=0;
     document.getElementById('sdot').classList.remove('on');
     document.getElementById('slbl').textContent='연결 안됨';
     stopLiveTimer();
@@ -5046,8 +5322,9 @@ function buildScreenSlideFields(s){
  * 현재 슬라이드 데이터를 외부 송출 화면에 전송한다.
  * renderSlide() 또는 슬라이드 변경 시마다 호출된다.
  * 송출 화면이 열려 있지 않으면 아무것도 하지 않는다.
+ * to: 그 송출 화면(모니터 id)에만 보낼 때 (새로 열린 송출 화면). 없으면 모든 송출 화면
  */
-function syncScreen(){
+function syncScreen(to){
   if(!screenOpen || !window.electronAPI) return;
 
   const f=getFlat();
@@ -5083,30 +5360,8 @@ function syncScreen(){
       return s.mediaURL;                        // 첫 전송 → 전체 data URL 포함
     })(),
     nxt:nxt?getSlidePreviewText(nxt):null,
-    nxtMedia:(()=>{
-      if(!nxt||nxt.mediaType!=='video') return null;
-      if(gv&&bgVideoSpecOf(nxt)?.key===gv.key) return null; // 같은 배경 영상(그룹·라이브)은 이어서 재생되므로 미리 불러올 필요 없음
-      const id=_getMediaId(nxt.mediaURL);
-      return {
-        mId:id||undefined,
-        mURL:(()=>{
-          if(!id) return nxt.mediaURL||null;
-          if(_screenSentMedia.has(id)) return null;
-          _screenSentMedia.add(id);
-          return nxt.mediaURL;
-        })(),
-        mType:nxt.mediaType,
-        mAudioEnabled:nxt.mediaAudioEnabled===true,
-        mLoop:nxt.mediaLoop!==false,
-        mLoopMode:nxt.mediaLoopMode||'normal',
-        mLoopFade:nxt.mediaLoopFade??1,
-        mAutoPlay:nxt.mediaAutoPlay!==false,
-        mOffX:nxt.mediaOffX??50,
-        mOffY:nxt.mediaOffY??50,
-        mScale:nxt.mediaScale??100,
-        mFit:['cover','contain','fill'].includes(nxt.mediaFit)?nxt.mediaFit:'cover'
-      };
-    })(),
+    // 곧 나올 영상: 송출 화면이 앞의 몇 개만 첫 화면까지 미리 준비해 둔다 (_upcomingVideos)
+    up:_upcomingPayload(to),
     // 배경 컨트롤로 배경을 바꿀 때는 그 전환 시간으로 한 번 크로스페이드
     fd:(_liveBgFdOnce!=null?_liveBgFdOnce:(s.fadeSecs!=null?s.fadeSecs:getFade())),
     // 배경 밝기 (1 = 원래 밝기). 송출 화면이 배경 사진·영상에만 적용한다
@@ -5119,18 +5374,24 @@ function syncScreen(){
     if(!sent) _screenSentMedia.add(gv.key);
     payload.gbg={...gv, url:sent?null:gv.url};
   }
+  // 송출 화면이 다른 영상으로 전환하는 동안(첫 화면 준비 + 페이드) 편집 미리보기는 새 영상을 열지 않는다 (_previewVideoHoldMs)
+  if(to===undefined){
+    const outKey=(_outVideoOf(s)||{}).key||'';
+    if(outKey&&outKey!==_pvOutKey) _pvVidHoldUntil=Date.now()+Math.round((Number(payload.fd)||0)*1000)+600;
+    _pvOutKey=outKey;
+  }
 
   try{
     if(typeof window.electronAPI.sendSlide === 'function'){
-      window.electronAPI.sendSlide(payload);
+      window.electronAPI.sendSlide(payload, to);
     } else if(typeof window.electronAPI.sendSlideUpdate === 'function'){
-      window.electronAPI.sendSlideUpdate(payload);
+      window.electronAPI.sendSlideUpdate(payload, to);
     }
   }catch(e){
     console.error('외부 화면 송출 실패:', e);
   }
   // 슬라이드별 마커 선 상태를 송출 화면에 동기화
-  _sendMarkerLine();
+  _sendMarkerLine(to);
 }
 
 function blankScreen(){
@@ -6353,7 +6614,8 @@ function createBgPicker(id,o){
 }
 
 // ──────────── 배경 컨트롤 (송출 중 배경 전환 · 밝기) ────────────
-// 송출 중에 배경을 바로 바꾸고 밝기를 조절하는 떠 있는 패널.
+// 송출 중에 배경을 바로 바꾸고 밝기를 조절한다. 프로젝터 설정 패널(툴바 [프로젝터])의 [배경] 탭.
+// (같은 패널의 [화면 자르기] 탭은 아래 '화면 자르기' 부분)
 //   - 1~9번 칸에 배경(기본 색·기본 배경·내 배경 보관함)을 지정해 둔다.
 //   - 숫자키(또는 칸 클릭)를 한 번 누르면 패널 미리보기 화면에만 보이고,
 //     미리보기 중인 번호를 한 번 더 누르면 송출한다. 0은 슬라이드에 지정된 원래 배경.
@@ -6368,7 +6630,8 @@ const LIVE_BG_LOOP_FADE=1;  // 칸 영상의 페이드 반복에서 끝과 처�
 // slots[i] = null | { kind:'lib'|'preset'|'color', libId|presetId|colorId, label, brightness(0~150) }
 // panel.dock: 'float'(떠 있는 창) | 'right'(오른쪽 패널 안). x·y는 떠 있는 창의 위치.
 //   v:2 = 가로로 긴 모양. 예전(세로로 긴 모양) 위치는 크기가 달라 쓰지 않는다
-let _lbState={slots:Array(LIVE_BG_SLOTS).fill(null),origBrightness:100,fade:1,panel:{v:2,open:false,x:null,y:null,dock:'float'}};
+// panel.tab: 'bg'(배경) | 'crop'(화면 자르기) — 프로젝터 설정 패널에서 마지막으로 본 탭
+let _lbState={slots:Array(LIVE_BG_SLOTS).fill(null),origBrightness:100,fade:1,panel:{v:2,open:false,x:null,y:null,dock:'float',tab:'bg'}};
 let _lbLive='orig';       // 송출 중인 배경: 'orig'(원래 배경) 또는 칸 번호(0~8). 앱을 켜면 항상 원래 배경
 let _lbPrev='orig';       // 패널 미리보기 대상 (송출 중인 배경과 같으면 미리보기 없음)
 let _liveBgFdOnce=null;   // 배경을 송출할 때 한 번만 쓰는 전환 시간(초). syncScreen이 슬라이드 페이드 대신 쓴다
@@ -6404,7 +6667,7 @@ function loadLiveBg(){
       fade:LIVE_BG_FADES.includes(d.fade)?d.fade:1,
       panel:{v:2,open:pn.open===true,
         x:keepPos&&Number.isFinite(pn.x)?pn.x:null,y:keepPos&&Number.isFinite(pn.y)?pn.y:null,
-        dock:pn.dock==='right'?'right':'float'}
+        dock:pn.dock==='right'?'right':'float',tab:pn.tab==='crop'?'crop':'bg'}
     };
   }catch(error){
     console.warn('배경 컨트롤 설정 불러오기 실패:', error);
@@ -6520,8 +6783,10 @@ function liveBgPress(key){
   const n=parseInt(key,10);
   if(!(n>=0&&n<=LIVE_BG_SLOTS)) return;
   const t=n===0?'orig':n-1;
+  // 패널이 [화면 자르기] 탭이면 [배경] 탭으로 넘어가 미리보기부터 보여 준다
+  const onBgTab=_lbState.panel.open&&_lbState.panel.tab==='bg';
   if(t!=='orig'&&!_lbSlotSpec(t)){
-    openLiveBgPanel();
+    openLiveBgPanel('bg');
     toast(_lbState.slots[t]
       ? n+'번 배경을 찾을 수 없습니다 (내 배경에서 지워짐)'
       : n+'번 칸이 비어 있습니다 · 칸을 눌러 배경을 지정하세요');
@@ -6530,14 +6795,15 @@ function liveBgPress(key){
   const live=_lbEffLive();
   if(t===live){
     _lbPrev=live;
-    renderLiveBgUI();
+    if(_lbState.panel.open&&!onBgTab) openLiveBgPanel('bg');
+    else renderLiveBgUI();
     toast(_lbTargetName(t)+' · 지금 송출 중');
     return;
   }
-  if(_lbPrev===t&&_lbState.panel.open){ takeLiveBg(); return; }
+  if(_lbPrev===t&&onBgTab){ takeLiveBg(); return; }
   _lbPrev=t;
-  if(_lbState.panel.open) renderLiveBgUI();
-  else openLiveBgPanel();
+  if(onBgTab) renderLiveBgUI();
+  else openLiveBgPanel('bg');
   toast(_lbTargetName(t)+' 미리보기 · 한 번 더 누르면 송출');
 }
 
@@ -6679,10 +6945,16 @@ function toggleLiveBgPanel(){
   else openLiveBgPanel();
 }
 
-function openLiveBgPanel(){
+/**
+ * 프로젝터 설정 패널을 연다 (열려 있으면 그대로).
+ * @param {string} [tab] - 'bg'(배경) | 'crop'(화면 자르기). 없으면 마지막으로 본 탭
+ */
+function openLiveBgPanel(tab){
   const el=document.getElementById('liveBgPanel');
   if(!el) return;
   const wasOpen=el.classList.contains('show');
+  const tabChanged=(tab==='bg'||tab==='crop')&&tab!==_lbState.panel.tab;
+  if(tabChanged){ _lbBlurInputs(); _lbMenuClose(); closeCropSavePopup(); _lbState.panel.tab=tab; }
   _lbState.panel.open=true;
   el.classList.add('show');
   _lbApplyDock();
@@ -6695,14 +6967,45 @@ function openLiveBgPanel(){
     saveLiveBg();
     // 그룹·슬라이드 모달에서 보관함이 바뀌었을 수 있으므로 열 때마다 새로 읽는다
     refreshBgLib().then(()=>{ if(_lbState.panel.open) renderLiveBgUI(); });
+  }else if(tabChanged){
+    saveLiveBg();
   }
+  // 송출 화면 목록도 새로 (조작창을 다른 모니터로 옮겼을 수 있다)
+  if(_lbState.panel.tab==='crop'&&(!wasOpen||tabChanged)) _outRefresh();
+}
+
+/** 프로젝터 설정 패널의 탭을 바꾼다 ('bg' 배경 | 'crop' 화면 자르기) */
+function setProjTab(tab){
+  if(tab!=='bg'&&tab!=='crop') return;
+  if(!_lbState.panel.open){ openLiveBgPanel(tab); return; }
+  if(tab===_lbState.panel.tab) return;
+  _lbBlurInputs();
+  _lbMenuClose();
+  closeCropSavePopup();
+  _lbState.panel.tab=tab;
+  saveLiveBg();
+  renderLiveBgUI();
+  _lbPlacePanel();
+  _lbSchedulePvText();
+  if(tab==='crop') _outRefresh();
+}
+
+/**
+ * 패널 안의 입력칸·슬라이더에 남은 포커스를 놓는다 (탭을 바꾸거나 닫을 때).
+ * 포커스가 남아 있으면 숫자키·방향키가 슬라이드 조작 대신 그 칸으로 들어간다.
+ */
+function _lbBlurInputs(){
+  const el=document.getElementById('liveBgPanel'), a=document.activeElement;
+  if(el&&a&&a!==document.body&&el.contains(a)&&typeof a.blur==='function') a.blur();
 }
 
 function closeLiveBgPanel(){
   const el=document.getElementById('liveBgPanel');
+  _lbBlurInputs();
   _lbState.panel.open=false;
   if(el) el.classList.remove('show');
   _lbMenuClose();
+  closeCropSavePopup();
   _lbWatchPvText(false);
   _lbPrev=_lbEffLive();  // 닫으면 미리보기 취소
   _lbStopPreview();      // 미리보기 영상의 디코더를 놓아 준다
@@ -6712,7 +7015,7 @@ function closeLiveBgPanel(){
 
 /**
  * 저장된 위치에 떠 있는 패널을 놓는다. 처음엔 편집 미리보기 영역의 아래쪽 가운데.
- * 창 밖으로 나가지 않게, 그리고 위쪽 툴바(송출 시작·정지, [배경] 버튼)는 가리지 않게 맞춘다.
+ * 창 밖으로 나가지 않게, 그리고 위쪽 툴바(송출 시작·정지, [프로젝터] 버튼)는 가리지 않게 맞춘다.
  * 창이 작아 다 들어가지 않으면 패널 안에서 스크롤한다. (오른쪽 패널 안에 있으면 할 일 없음)
  */
 function _lbPlacePanel(){
@@ -6879,9 +7182,11 @@ function _lbWatchPvText(on){
 }
 
 // ── 패널 그리기 ──
-/** 패널 전체와 툴바 [배경] 버튼을 다시 그린다 */
+/** 프로젝터 설정 패널 전체와 툴바 [프로젝터] 버튼을 다시 그린다 */
 function renderLiveBgUI(){
   const live=_lbEffLive();
+  // 미리 보는 칸이 바뀌었으면 송출 화면이 그 영상을 미리 준비하게 한다 (한 번 더 누르면 바로 송출되므로)
+  _sendUpcoming();
   const btn=document.getElementById('liveBgBtn');
   if(btn){
     btn.classList.toggle('on',_lbState.panel.open);
@@ -6890,11 +7195,23 @@ function renderLiveBgUI(){
     if(badge) badge.textContent=live!=='orig'?String(live+1):'';
   }
   const panel=document.getElementById('liveBgPanel');
-  if(!panel||!panel.classList.contains('show')) return;
+  const shown=!!panel&&panel.classList.contains('show');
+  if(shown){
+    const tab=_lbState.panel.tab;
+    panel.classList.toggle('tab-crop',tab==='crop');
+    [['lbTabBg','bg'],['lbTabCrop','crop']].forEach(([id,k])=>{
+      const b=document.getElementById(id);
+      if(!b) return;
+      b.classList.toggle('on',tab===k);
+      b.setAttribute('aria-selected',tab===k?'true':'false');
+    });
+  }
+  _pcRender();   // 화면 자르기 표시 (툴바 버튼 설명은 패널이 닫혀 있어도)
+  if(!shown) return;
   const st=document.getElementById('lbState');
   if(st){
-    st.textContent=screenOpen?'송출 중':'송출 전';
     st.classList.toggle('on',!!screenOpen);
+    _outRenderStatus();
   }
   const fade=document.getElementById('lbFade');
   if(fade) fade.value=String(_lbState.fade);
@@ -6902,11 +7219,14 @@ function renderLiveBgUI(){
   _lbRenderPreview();
 }
 
+/** 패널 미리보기 화면에 보일 배경: [배경] 탭은 미리보기 대상, [화면 자르기] 탭은 지금 송출 중인 배경 */
+function _lbPvTarget(){ return _lbState.panel.tab==='crop'?_lbEffLive():_lbPrev; }
+
 /** 패널 위쪽 미리보기 화면: 미리보기 대상의 배경을 그 밝기로 보여 준다 */
 function _lbRenderPreview(){
   const pv=document.getElementById('lbPv'), media=document.getElementById('lbPvMedia');
   if(!pv||!media) return;
-  const t=_lbPrev, isLive=t===_lbEffLive();
+  const t=_lbPvTarget(), isLive=t===_lbEffLive();
   const sp=_lbTargetSpec(t);
   pv.classList.toggle('live',isLive);
   pv.classList.toggle('prev',!isLive);
@@ -7076,7 +7396,7 @@ function _lbOnSlideChange(){
   if(!panel||!panel.classList.contains('show')) return;
   const card=document.getElementById('lbOrigCard');
   if(card) _lbSetOrigThumb(card);
-  if(_lbPrev==='orig') _lbRenderPreview();
+  if(_lbPvTarget()==='orig') _lbRenderPreview();
   _lbSchedulePvText();
 }
 
@@ -7213,6 +7533,723 @@ function _lbMenuClose(){
     if(menu.contains(e.target)) return;
     _lbMenuClose();
   });
+})();
+
+// ──────────── 화면 자르기 (프로젝터 설정 패널의 [화면 자르기] 탭) ────────────
+// 송출 화면의 가장자리를 위·아래·왼쪽·오른쪽에서 원하는 만큼 자른다. 값은 슬라이드 크기의 %.
+//   - 잘라 내기: 슬라이드는 그대로 두고 잘린 가장자리만 검게 내보낸다
+//                (프로젝터 빛이 스크린 밖이나 가려진 곳으로 나가지 않게)
+//   - 줄여 넣기: 슬라이드 전체를 남은 곳에 맞게 줄인다 (가장자리 글자도 잘리지 않게)
+//   - 송출 화면(screen.html)에만 적용한다. 슬라이드·프로젝트 데이터, 편집 미리보기, PPT 내보내기는 그대로.
+//   - 이 컴퓨터에 연결한 프로젝터에 맞춘 값이므로 프로젝트가 아니라 이 컴퓨터(localStorage)에 저장한다.
+//   - 마주 보는 두 쪽(위+아래, 왼쪽+오른쪽)은 합쳐서 90%까지 자를 수 있다 (적어도 10%는 남긴다).
+//   - 장소·프로젝터마다 값을 이름 붙여 저장해 두고(저장된 자르기) 칩을 눌러 바로 바꿀 수 있다.
+//   - 송출 화면이 여럿이면(외부 모니터마다 하나씩 함께 송출) 자르기는 화면마다 따로다.
+//     탭 위쪽의 송출 화면 칸에서 고칠 화면을 고르고, 체크를 끄면 그 화면에는 송출하지 않는다.
+//     값은 모니터마다 기억한다 (다음에 같은 모니터를 꽂으면 그 값으로 자른다).
+const OUTPUT_CROP_STORAGE_KEY='worshipslide-pro-output-crop-v1';
+const PC_MAX_PAIR=90;
+const PC_EDGES=['t','b','l','r'];
+const PC_OPP={t:'b',b:'t',l:'r',r:'l'};
+const PC_NAME_MAX=30;
+const PC_OUTS_MAX=30;   // 기억해 두는 모니터 수 (넘으면 지금 연결되지 않은 오래된 것부터 지운다)
+const PROJ_BTN_TITLE='프로젝터 설정 · 배경 컨트롤(숫자키 한 번: 미리보기, 한 번 더: 송출, 0: 원래 배경)과 화면 자르기';
+// 모니터마다 기억하는 설정: { id, label, out, on, t, b, l, r, fit, name }
+//   id·label: 모니터 (main.js가 알려 준 display.id와 모니터 이름). id와 이름이 같으면 같은 모니터로 본다.
+//             다른 단자에 꽂아 id가 바뀌어도 이름이 같은 기억이 하나뿐이면 그 모니터로 이어 쓴다
+//   out: 이 화면에 송출 (false면 송출을 시작해도 이 모니터에는 송출 창을 열지 않는다)
+//   on: 자르기 사용 (끄면 값은 그대로 두고 송출 화면만 원래대로), t·b·l·r: 자를 만큼(%), fit: 줄여 넣기
+//   name: 지금 값을 불러오거나 저장한 '저장된 자르기' 이름 ([＋ 저장]에서 덮어쓸 대상, 없으면 '')
+// 처음 보는 모니터는 기본값(송출함, 자르지 않음)으로 시작하고, 값을 바꾸면 그때 기억한다(_pcKeep).
+let _pcOuts=[];
+let _pcCur=new Map();     // 지금 송출할 수 있는 모니터 id → 그 모니터의 설정 (_pcOuts의 것 또는 처음 보는 모니터의 기본값)
+let _pcSel='';            // [화면 자르기] 탭에서 고치고 있는 송출 화면 (모니터 id)
+let _pcState=_pcNewOut({id:'',label:''});  // 고치고 있는 송출 화면의 설정 (_pcCur.get(_pcSel))
+let _pcLegacy=null;       // 송출 화면이 하나뿐이던 때 저장한 자르기 값 → 처음 보는 첫 송출 화면에 이어 쓴다
+// 저장된 자르기: [{ name, t, b, l, r, fit }] — 저장한 순서대로. 같은 저장소 키에 함께 저장한다
+let _pcPresets=[];
+let _pcSaveTimer=null, _pcSendRaf=0;
+const _pcSendIds=new Set();   // 다음 화면 그리기 때 자르기 값을 보낼 송출 화면들
+
+// 송출할 수 있는 모니터 (main.js가 알려 준다): [{ id, label, w, h, internal, main, open }]
+//   조작창이 있는 모니터를 뺀 외부 모니터 (왼쪽부터). 외부 모니터가 없으면 조작창 모니터 하나 (main: true)
+//   w·h: 해상도, open: 지금 송출 창이 열려 있음
+let _outDisplays=[];
+let _outAutoKey='';   // 송출 중 새 모니터에 송출 창을 열려고 한 화면들 (열기에 실패해도 거듭 열려고 하지 않게)
+
+function _pcNewOut(d){ return {id:d.id,label:d.label,out:true,on:true,t:0,b:0,l:0,r:0,fit:false,name:''}; }
+
+function _pcClamp(v){ const n=Number(v); return Number.isFinite(n)?Math.round(Math.max(0,Math.min(PC_MAX_PAIR,n))*10)/10:0; }
+/** 숫자 칸 표시: 5 → '5', 12.5 → '12.5' */
+function _pcFmt(v){ return String(Math.round((Number(v)||0)*10)/10); }
+/** 마주 보는 두 쪽이 합쳐서 90%를 넘으면 비율대로 줄인다 (저장된 값을 읽을 때) */
+function _pcNormPairs(s){
+  [['t','b'],['l','r']].forEach(([a,b])=>{
+    const sum=s[a]+s[b];
+    if(sum>PC_MAX_PAIR){ s[a]=Math.floor(s[a]*PC_MAX_PAIR/sum*10)/10; s[b]=Math.floor(s[b]*PC_MAX_PAIR/sum*10)/10; }
+  });
+  return s;
+}
+/** 저장된 자르기 목록을 검사한다. 이름이 없거나 겹치면 뺀다 */
+function _pcCleanPresets(arr){
+  const out=[], seen=new Set();
+  (Array.isArray(arr)?arr:[]).forEach(p=>{
+    if(!p||typeof p!=='object') return;
+    const name=String(p.name||'').trim().slice(0,PC_NAME_MAX);
+    if(!name||seen.has(name)) return;
+    seen.add(name);
+    const v={name,t:0,b:0,l:0,r:0,fit:p.fit===true};
+    PC_EDGES.forEach(e=>{ v[e]=_pcClamp(p[e]); });
+    out.push(_pcNormPairs(v));
+  });
+  return out;
+}
+
+/** 저장된 모니터 설정 하나를 검사한다 (자르기 값, 저장된 자르기 이름) */
+function _pcCleanOut(o){
+  if(!o||typeof o!=='object') return null;
+  const s=_pcNewOut({id:String(o.id??''),label:String(o.label??'')});
+  s.out=o.out!==false;
+  s.on=o.on!==false;
+  s.fit=o.fit===true;
+  PC_EDGES.forEach(e=>{ s[e]=_pcClamp(o[e]); });
+  _pcNormPairs(s);
+  if(typeof o.name==='string'&&_pcPresets.some(p=>p.name===o.name)) s.name=o.name;
+  return s;
+}
+
+function loadOutputCrop(){
+  try{
+    const raw=localStorage.getItem(OUTPUT_CROP_STORAGE_KEY);
+    const d=raw?JSON.parse(raw):{};
+    _pcPresets=_pcCleanPresets(d.presets);
+    if(Array.isArray(d.outs)){
+      _pcOuts=d.outs.map(_pcCleanOut).filter(o=>o&&o.id);
+      if(typeof d.sel==='string') _pcSel=d.sel;
+    }else if(PC_EDGES.some(e=>_pcClamp(d[e])>0)){
+      // 송출 화면이 하나뿐이던 때 형식 (자르기 값이 맨 위에): 처음 보는 첫 송출 화면에 이어 쓴다
+      _pcLegacy=_pcCleanOut(d);
+    }
+  }catch(error){
+    console.warn('화면 자르기 설정 불러오기 실패:', error);
+  }
+  _pcResolve();
+  _outRefresh();
+}
+
+function saveOutputCrop(){
+  clearTimeout(_pcSaveTimer);
+  _pcSaveTimer=null;
+  try{
+    localStorage.setItem(OUTPUT_CROP_STORAGE_KEY, JSON.stringify({v:2,outs:_pcOuts,sel:_pcSel,presets:_pcPresets}));
+  }catch(error){
+    console.warn('화면 자르기 설정 저장 실패:', error);
+  }
+}
+function _pcSaveSoon(){ clearTimeout(_pcSaveTimer); _pcSaveTimer=setTimeout(saveOutputCrop,400); }
+
+/**
+ * 지금 연결된 모니터마다 설정을 찾는다 (_pcCur). 고치던 화면이 빠졌으면 첫 화면을 고른다.
+ *   1) id와 이름이 같은 기억  2) 이름만 같은 기억이 하나뿐이고 그 이름의 모니터도 하나뿐이면 그것 (id를 고쳐 둔다)
+ *   3) 처음 보는 모니터는 기본값
+ */
+function _pcResolve(){
+  const cur=new Map(), used=new Set();
+  _outDisplays.forEach(d=>{
+    const e=_pcOuts.find(o=>!used.has(o)&&o.id===d.id&&o.label===d.label);
+    if(e){ cur.set(d.id,e); used.add(e); }
+  });
+  _outDisplays.forEach(d=>{
+    if(cur.has(d.id)||!d.label) return;
+    const same=_pcOuts.filter(o=>!used.has(o)&&o.label===d.label);
+    const twins=_outDisplays.filter(x=>!cur.has(x.id)&&x.label===d.label);
+    if(same.length===1&&twins.length===1){ same[0].id=d.id; cur.set(d.id,same[0]); used.add(same[0]); }
+  });
+  _outDisplays.forEach(d=>{ if(!cur.has(d.id)) cur.set(d.id,_pcNewOut(d)); });
+  _pcCur=cur;
+  if(_pcLegacy&&_outDisplays.length){
+    const e=cur.get(_outDisplays[0].id);
+    if(!_pcOuts.includes(e)){
+      ['on','t','b','l','r','fit','name'].forEach(k=>{ e[k]=_pcLegacy[k]; });
+      _pcKeep(e);
+    }
+    _pcLegacy=null;
+    saveOutputCrop();
+  }
+  // 목록을 아직 받지 못했으면 (앱을 켠 직후) 마지막으로 고르던 화면을 그대로 둔다
+  if(!_outDisplays.length) return;
+  if(!cur.has(_pcSel)) _pcSel=_outDisplays[0].id;
+  _pcState=cur.get(_pcSel);
+}
+
+/** 값을 바꾼 모니터 설정을 기억해 둔다 (처음 보는 모니터는 이때부터 기억). 너무 많으면 오래된 것부터 지운다 */
+function _pcKeep(e){
+  if(!e||!e.id||_pcOuts.includes(e)) return;
+  _pcOuts.push(e);
+  const now=new Set(_pcCur.values());
+  for(let i=0;_pcOuts.length>PC_OUTS_MAX&&i<_pcOuts.length;){
+    if(now.has(_pcOuts[i])||_pcOuts[i]===e) i++;
+    else _pcOuts.splice(i,1);
+  }
+}
+
+/** 송출 화면에 실제로 적용할 값 (자르기를 끄면 모두 0). s: 그 화면의 설정 (없으면 고치고 있는 화면) */
+function _pcEff(s=_pcState){
+  return s.on?{t:s.t,r:s.r,b:s.b,l:s.l,fit:s.fit}:{t:0,r:0,b:0,l:0,fit:false};
+}
+/** 그 송출 화면을 자르고 있는지 (s 없으면 고치고 있는 화면) */
+function _pcActive(s=_pcState){ return s.on&&(s.t>0||s.b>0||s.l>0||s.r>0); }
+/** 지금 연결된 송출 화면 중 하나라도 자르고 있는지 */
+function _pcActiveAny(){ return [..._pcCur.values()].some(s=>_pcActive(s)); }
+
+/**
+ * 송출 화면에 자르기 값을 보낸다. id가 있으면 그 송출 화면에만, 없으면 모든 송출 화면에 각자의 값을.
+ * 송출 화면이 새로 준비되면(screen-ready) 그 화면에 첫 화면보다 먼저 다시 보낸다
+ */
+function _pcSend(id){
+  if(id==null&&_pcSendRaf){ cancelAnimationFrame(_pcSendRaf); _pcSendRaf=0; _pcSendIds.clear(); }
+  if(!screenOpen||!window.electronAPI||typeof window.electronAPI.sendOutputCrop!=='function') return;
+  (id!=null?[String(id)]:[..._pcCur.keys()]).forEach(k=>{
+    const s=_pcCur.get(k);
+    if(s) window.electronAPI.sendOutputCrop(k,_pcEff(s));
+  });
+}
+/** 끄는 동안 값이 계속 바뀌어도 화면을 한 번 그릴 때마다 한 번만 보낸다 (고치고 있는 송출 화면에) */
+function _pcSendSoon(){
+  if(_pcSel) _pcSendIds.add(_pcSel);
+  if(_pcSendRaf) return;
+  _pcSendRaf=requestAnimationFrame(()=>{
+    _pcSendRaf=0;
+    const ids=[..._pcSendIds];
+    _pcSendIds.clear();
+    ids.forEach(id=>_pcSend(id));
+  });
+}
+
+/** 값이 바뀐 뒤: 기억해 두고, 표시를 고치고, 송출 화면에 보내고 저장 */
+function _pcChanged(){
+  _pcKeep(_pcState);
+  _pcRender();
+  _pcSendSoon();
+  _pcSaveSoon();
+}
+
+// ── 송출 화면 (모니터) 목록 ──
+/** main.js에 송출할 수 있는 모니터 목록을 다시 묻는다 */
+function _outRefresh(){
+  const api=window.electronAPI;
+  if(!api||typeof api.getOutputDisplays!=='function') return Promise.resolve();
+  return api.getOutputDisplays().then(_outSetList).catch(()=>{});
+}
+
+/** 받은 모니터 목록을 반영한다: 모니터마다 자르기 설정을 다시 찾고 다시 그린다 */
+function _outSetList(info){
+  if(!info||!Array.isArray(info.displays)) return;
+  _outDisplays=info.displays.map(d=>({
+    id:String(d.id),label:String(d.label||''),w:Number(d.w)||0,h:Number(d.h)||0,
+    internal:!!d.internal,main:!!d.main,open:!!d.open
+  }));
+  _pcResolve();
+  _pcRender();
+  _outRenderStatus();
+}
+
+/** 송출할 모니터 id: 송출을 꺼 둔 모니터는 뺀다 (모두 꺼 두었으면 외부 모니터 모두) */
+function _outWantIds(){
+  const ext=_outDisplays.filter(d=>!d.main);
+  const on=ext.filter(d=>_pcCur.get(d.id)?.out!==false);
+  return (on.length?on:ext).map(d=>d.id);
+}
+
+/** 송출 중이면 송출 창을 송출할 모니터에 맞춘다 (켠 화면에는 열고, 끈 화면의 창은 닫는다) */
+function _outSync(){
+  const api=window.electronAPI;
+  if(!screenOpen||!api||typeof api.openSecondScreen!=='function') return;
+  api.openSecondScreen({ids:_outWantIds()}).then(res=>{ if(res&&res.displays) _outSetList(res); }).catch(()=>{});
+}
+
+/** 송출 화면 번호와 이름 (예: '2번 화면(LG TV)'). 송출 화면이 하나뿐이면 '송출 화면' */
+function _outLabel(id){
+  const i=_outDisplays.findIndex(d=>d.id===id);
+  if(i<0||_outDisplays.length<2) return '송출 화면';
+  return (i+1)+'번 화면('+_outName(_outDisplays[i])+')';
+}
+/** 모니터 이름 (이름을 알 수 없으면 노트북 화면 / 모니터) */
+function _outName(d){ return d.label||(d.internal?'노트북 화면':'모니터'); }
+
+/** 송출 상태 글자 (툴바의 연결 표시, 프로젝터 설정 제목 줄): 송출 화면이 둘 이상이면 몇 개인지도 */
+function _outRenderStatus(){
+  const n=_outDisplays.filter(d=>d.open).length;
+  const many=n>1?' · 화면 '+n+'개':'';
+  const lbl=document.getElementById('slbl');
+  if(lbl&&screenOpen) lbl.textContent='연결됨'+many;
+  const st=document.getElementById('lbState');
+  if(st) st.textContent=screenOpen?'송출 중'+many:'송출 전';
+}
+
+/** [화면 자르기] 탭에서 고칠 송출 화면을 고른다 */
+function selectCropOutput(id){
+  id=String(id);
+  if(id===_pcSel||!_pcCur.has(id)) return;
+  closeCropSavePopup();
+  _pcDisarmDel();
+  _pcSel=id;
+  _pcState=_pcCur.get(id);
+  _pcRender();
+  _pcSaveSoon();
+}
+
+/**
+ * 그 화면에 송출하기 켜기·끄기. 송출 중이면 바로 그 화면의 송출 창을 열거나 닫는다.
+ * 외부 모니터 중 하나는 송출해야 하므로 마지막으로 켜 둔 화면은 끌 수 없다.
+ */
+function setOutputSend(id,on){
+  const s=_pcCur.get(String(id));
+  if(!s) return;
+  on=!!on;
+  if(!on&&!_outDisplays.some(d=>d.id!==s.id&&!d.main&&_pcCur.get(d.id)?.out!==false)){
+    _pcRender();
+    toast('송출할 화면이 하나는 있어야 합니다');
+    return;
+  }
+  s.out=on;
+  _pcKeep(s);
+  saveOutputCrop();
+  _pcRender();
+  _outSync();
+  toast(_outLabel(s.id)+(on?'에 송출합니다':'에는 송출하지 않습니다'));
+}
+
+/**
+ * 한쪽에서 자를 만큼을 바꾼다. 마주 보는 쪽과 합쳐 90%를 넘으면 이쪽을 줄인다.
+ * 자르기를 꺼 둔 채 값을 바꾸면 다시 켠다 (바꾼 모양이 송출 화면에 바로 보이도록).
+ */
+function _pcSetEdge(e,v){
+  if(!PC_EDGES.includes(e)) return;
+  const n=Math.min(_pcClamp(v),Math.round((PC_MAX_PAIR-_pcState[PC_OPP[e]])*10)/10);
+  if(n===_pcState[e]&&_pcState.on){ _pcRender(); return; }  // 끝에 닿은 슬라이더를 제자리로
+  _pcState[e]=n;
+  _pcState.on=true;
+  _pcChanged();
+}
+
+/** 잘라 내기(false) / 줄여 넣기(true) */
+function setOutputCropFit(fit){
+  _pcState.fit=!!fit;
+  _pcChanged();
+}
+
+/** [자르기 사용] 켜기·끄기. 끄면 자른 값은 그대로 두고 송출 화면만 원래대로 */
+function setOutputCropOn(on){
+  _pcState.on=!!on;
+  _pcChanged();
+}
+
+/** [초기화] 네 쪽 모두 0% */
+function resetOutputCrop(){
+  PC_EDGES.forEach(e=>{ _pcState[e]=0; });
+  _pcChanged();
+  toast(_outDisplays.length>1
+    ? _outLabel(_pcSel)+' 자르기 초기화 · 이 화면은 자르지 않습니다'
+    : '화면 자르기 초기화 · 송출 화면을 자르지 않습니다');
+}
+
+/**
+ * 화면 자르기 표시: 툴바 버튼 설명, 탭의 점, 미리보기의 잘린 곳·손잡이,
+ * [화면 자르기] 탭의 송출 화면 칸·입력칸·저장된 자르기
+ */
+function _pcRender(){
+  const active=_pcActiveAny();
+  const btn=document.getElementById('liveBgBtn');
+  if(btn) btn.title=PROJ_BTN_TITLE+(active?' · 지금 화면 자르기 사용 중':'');
+  const panel=document.getElementById('liveBgPanel');
+  if(!panel) return;
+  panel.classList.toggle('cropOn',active);
+  if(!panel.classList.contains('show')) return;
+  _pcRenderOverlay();
+  if(_lbState.panel.tab!=='crop') return;
+  _pcRenderOuts();
+  PC_EDGES.forEach(e=>{
+    const r=document.getElementById('pcR_'+e), n=document.getElementById('pcN_'+e);
+    if(r) r.value=String(_pcState[e]);
+    if(n&&document.activeElement!==n) n.value=_pcFmt(_pcState[e]);
+  });
+  const on=document.getElementById('pcOn');
+  if(on) on.checked=_pcState.on;
+  document.getElementById('pcModeCut')?.classList.toggle('on',!_pcState.fit);
+  document.getElementById('pcModeFit')?.classList.toggle('on',_pcState.fit);
+  const desc=document.getElementById('pcDesc');
+  if(desc) desc.textContent=!_pcState.on
+    ? '자르기를 껐습니다 · 송출 화면을 자르지 않고 그대로 내보냅니다'
+    : _pcState.fit
+      ? '슬라이드 전체를 남은 곳에 맞게 줄입니다 · 글자가 잘리지 않습니다'
+      : '슬라이드는 그대로, 잘린 가장자리만 검게 나갑니다';
+  _pcRenderPresets();
+}
+
+/**
+ * 송출 화면 칸: 송출할 수 있는 모니터마다 [☑ 번호 이름 해상도 •]. 누르면 그 화면의 자르기를 고친다.
+ * 화면이 둘 이상이면 체크로 그 화면에 송출할지 정한다. 번호가 빨가면 지금 송출 중, 점은 자르기 사용 중
+ */
+function _pcRenderOuts(){
+  const wrap=document.getElementById('pcOuts'), box=document.getElementById('pcOutList'), hint=document.getElementById('pcOutsHint');
+  if(!wrap||!box) return;
+  wrap.classList.toggle('none',!_outDisplays.length);
+  box.textContent='';
+  const multi=_outDisplays.length>1;
+  _outDisplays.forEach((d,i)=>{
+    const s=_pcCur.get(d.id);
+    if(!s) return;
+    const off=multi&&s.out===false, act=_pcActive(s);
+    const chip=document.createElement('div');
+    chip.className='pcOut'+(d.id===_pcSel?' on':'')+(d.open?' live':'')+(off?' off':'')+(act?' crop':'');
+    const res=d.w&&d.h?d.w+'×'+d.h:'';
+    chip.title=(multi?(i+1)+'번 화면 · ':'')+_outName(d)+(res?' ('+res+')':'')
+      +(d.main?'\n외부 모니터가 없어 이 화면(조작창 화면)에 송출합니다':'')
+      +'\n'+(d.open?'지금 송출 중':off?'송출하지 않음 (체크하면 송출)':'송출 시작하면 이 화면에 송출')
+      +(act?' · 화면 자르기 사용 중':'')
+      +(multi?'\n누르면 이 화면의 자르기를 고칩니다':'');
+    if(multi){
+      const chk=document.createElement('input');
+      chk.type='checkbox';
+      chk.className='pcOutChk';
+      chk.checked=!off;
+      chk.title=off?'이 화면에도 송출하기':'이 화면에는 송출하지 않기';
+      chk.onclick=e=>e.stopPropagation();
+      chk.onchange=()=>{ setOutputSend(d.id,chk.checked); chk.blur(); };
+      chip.appendChild(chk);
+    }
+    const num=document.createElement('span');
+    num.className='pcOutNum';
+    num.textContent=String(i+1);
+    chip.appendChild(num);
+    const nm=document.createElement('span');
+    nm.className='pcOutName';
+    nm.textContent=_outName(d);
+    chip.appendChild(nm);
+    if(res){
+      const r=document.createElement('span');
+      r.className='pcOutRes';
+      r.textContent=res;
+      chip.appendChild(r);
+    }
+    const dot=document.createElement('span');
+    dot.className='pcOutDot';
+    chip.appendChild(dot);
+    chip.onclick=()=>selectCropOutput(d.id);
+    box.appendChild(chip);
+  });
+  if(hint) hint.textContent=_outDisplays.length===1&&_outDisplays[0].main
+    ? '외부 모니터를 연결하면 그 화면에 송출합니다'
+    : multi ? '고른 화면의 자르기를 고칩니다 · 체크를 끄면 그 화면에는 송출하지 않습니다' : '';
+}
+
+// ── 저장된 자르기 (이름 붙여 저장·덮어쓰기·불러오기·삭제) ──
+// 칩을 누르면 그 값으로 바로 자른다(송출 화면에도 바로). 불러온 뒤 값을 바꾸면 칩에 '바뀜'이 붙고,
+// [＋ 저장] → "이름" 덮어쓰기로 바꾼 값을 그 이름에 다시 저장한다. ✕는 한 번 더 눌러야 지운다.
+let _pcDelArm='', _pcDelTimer=null;   // ✕를 한 번 누른 칩의 이름 (3초 안에 한 번 더 누르면 삭제)
+
+function _pcPresetOf(name){ return (name&&_pcPresets.find(p=>p.name===name))||null; }
+/** 지금 값이 그 저장된 자르기와 같은지 */
+function _pcSameAs(p){
+  const s=_pcState;
+  return !!p&&PC_EDGES.every(e=>p[e]===s[e])&&p.fit===s.fit;
+}
+
+/** 저장된 자르기를 불러와 바로 자른다 (자르기를 꺼 두었으면 켠다) */
+function applyCropPreset(name){
+  const p=_pcPresetOf(name);
+  if(!p) return;
+  PC_EDGES.forEach(e=>{ _pcState[e]=p[e]; });
+  _pcState.fit=p.fit;
+  _pcState.on=true;
+  _pcState.name=p.name;
+  _pcChanged();
+  toast('"'+p.name+'" 자르기 적용'+(_outDisplays.length>1?' · '+_outLabel(_pcSel):''));
+}
+
+/** 지금 값을 그 이름으로 저장한다. 같은 이름이 있으면 그 자리에 덮어쓴다 */
+function _pcSavePreset(name){
+  const v={name,t:_pcState.t,b:_pcState.b,l:_pcState.l,r:_pcState.r,fit:_pcState.fit};
+  const i=_pcPresets.findIndex(p=>p.name===name);
+  if(i>=0) _pcPresets[i]=v;
+  else _pcPresets.push(v);
+  _pcState.name=name;
+  _pcKeep(_pcState);
+  saveOutputCrop();
+  _pcRender();
+  toast('"'+name+'" '+(i>=0?'덮어쓰기 ✓':'저장 ✓'));
+}
+
+function deleteCropPreset(name){
+  const i=_pcPresets.findIndex(p=>p.name===name);
+  if(i<0) return;
+  _pcPresets.splice(i,1);
+  // 이 이름을 불러와 쓰던 송출 화면들 (값은 그대로 두고 이름만 뗀다)
+  new Set([..._pcOuts,..._pcCur.values(),_pcState]).forEach(s=>{ if(s.name===name) s.name=''; });
+  _pcDelArm='';
+  clearTimeout(_pcDelTimer);
+  saveOutputCrop();
+  _pcRender();
+  toast('"'+name+'" 삭제됨');
+}
+
+function _pcArmDel(name){
+  _pcDelArm=name;
+  clearTimeout(_pcDelTimer);
+  _pcDelTimer=setTimeout(_pcDisarmDel,3000);
+  _pcRenderPresets();
+}
+/** 삭제 대기를 푼다. 칩을 다시 만들지 않고 그 자리에서 고친다 (누르는 중인 다른 칩이 바뀌면 클릭이 사라진다) */
+function _pcDisarmDel(){
+  clearTimeout(_pcDelTimer);
+  _pcDelTimer=null;
+  if(!_pcDelArm) return;
+  const name=_pcDelArm;
+  _pcDelArm='';
+  document.querySelectorAll('#pcChips .pcChip.arm').forEach(c=>{
+    c.classList.remove('arm');
+    const del=c.querySelector('.pcChipDel');
+    if(del){ del.textContent='×'; del.title='"'+name+'" 삭제'; }
+  });
+}
+
+/** 저장된 자르기 칩 (지금 이름이면 강조, 그 뒤로 값을 바꿨으면 '바뀜') */
+function _pcRenderPresets(){
+  const box=document.getElementById('pcChips');
+  if(!box) return;
+  box.textContent='';
+  if(!_pcPresets.length){
+    const em=document.createElement('span');
+    em.className='pcPresetsEmpty';
+    em.textContent='아직 없습니다';
+    box.appendChild(em);
+    return;
+  }
+  _pcPresets.forEach(p=>{
+    const cur=p.name===_pcState.name, mod=cur&&!_pcSameAs(p), arm=_pcDelArm===p.name;
+    const chip=document.createElement('div');
+    chip.className='pcChip'+(cur?' on':'')+(arm?' arm':'');
+    const desc='위 '+_pcFmt(p.t)+'% · 아래 '+_pcFmt(p.b)+'% · 왼쪽 '+_pcFmt(p.l)+'% · 오른쪽 '+_pcFmt(p.r)+'% · '+(p.fit?'줄여 넣기':'잘라 내기');
+    chip.title=p.name+'\n'+desc+(mod?'\n불러온 뒤 값이 바뀌었습니다 · [＋ 저장]에서 덮어쓸 수 있습니다':'\n누르면 이 값으로 자릅니다');
+    const nm=document.createElement('span');
+    nm.className='pcChipName';
+    nm.textContent=p.name;
+    chip.appendChild(nm);
+    if(mod){
+      const m=document.createElement('span');
+      m.className='pcChipMod';
+      m.textContent='바뀜';
+      chip.appendChild(m);
+    }
+    const del=document.createElement('button');
+    del.type='button';
+    del.className='pcChipDel';
+    del.textContent=arm?'삭제':'×';
+    del.title=arm?'한 번 더 누르면 삭제':'"'+p.name+'" 삭제';
+    del.onclick=e=>{
+      e.stopPropagation();
+      // 그린 뒤에 대기가 풀렸을 수 있으므로(_pcDisarmDel은 칩을 다시 그리지 않는다) 지금 상태로 판단한다
+      if(_pcDelArm===p.name) deleteCropPreset(p.name);
+      else _pcArmDel(p.name);
+    };
+    chip.appendChild(del);
+    chip.onclick=()=>{ _pcDisarmDel(); applyCropPreset(p.name); };
+    box.appendChild(chip);
+  });
+}
+
+// ── 이름 붙여 저장 창 ([＋ 저장]) ──
+/** 열기: 지금 쓰는 이름이 있으면 맨 위에 "이름" 덮어쓰기, 아래는 새 이름으로 저장 */
+function openCropSavePopup(){
+  const pop=document.getElementById('pcSavePopup'), btn=document.getElementById('pcSaveBtn'), input=document.getElementById('pcSaveName');
+  if(!pop||!btn||!input) return;
+  if(pop.classList.contains('open')){ closeCropSavePopup(); return; }
+  _pcDisarmDel();
+  const cur=_pcPresetOf(_pcState.name);
+  document.getElementById('pcSaveOverRow').classList.toggle('show',!!cur);
+  document.getElementById('pcSaveDivider').classList.toggle('show',!!cur);
+  if(cur) document.getElementById('pcSaveOverBtn').textContent='"'+cur.name+'" 덮어쓰기';
+  input.value='';
+  input.placeholder=cur?'새 이름...':'이름 (예: 본당 프로젝터)';
+  _pcSaveNameCheck();
+  pop.classList.add('open');
+  btn.classList.add('open');
+  // 버튼 아래에 펼친다. 아래 공간이 모자라면(떠 있는 패널은 보통 화면 아래쪽) 위로
+  const r=btn.getBoundingClientRect(), pw=pop.offsetWidth, ph=pop.offsetHeight;
+  pop.style.left=Math.round(Math.max(8,Math.min(r.left,window.innerWidth-pw-8)))+'px';
+  pop.style.top=Math.round(window.innerHeight-r.bottom-8>=ph+4?r.bottom+4:Math.max(8,r.top-ph-4))+'px';
+  setTimeout(()=>{ if(pop.classList.contains('open')) input.focus(); },0);
+}
+
+function closeCropSavePopup(){
+  const pop=document.getElementById('pcSavePopup');
+  if(!pop||!pop.classList.contains('open')) return;
+  pop.classList.remove('open');
+  document.getElementById('pcSaveBtn')?.classList.remove('open');
+  const input=document.getElementById('pcSaveName');
+  if(input&&document.activeElement===input) input.blur();
+}
+
+/** 이름 칸: 이미 있는 이름이면 [저장] 대신 [덮어쓰기]로 알려 준다 */
+function _pcSaveNameCheck(){
+  const input=document.getElementById('pcSaveName'), ok=document.getElementById('pcSaveOk'), note=document.getElementById('pcSaveNote');
+  if(!input||!ok||!note) return;
+  const name=input.value.trim();
+  const dup=!!_pcPresetOf(name);
+  ok.textContent=dup?'덮어쓰기':'저장';
+  note.textContent=dup?'"'+name+'"이(가) 이미 있습니다 · 지금 값으로 덮어씁니다':'';
+  note.classList.toggle('show',dup);
+}
+
+/** 새 이름으로 저장 (같은 이름을 쳤으면 그 이름에 덮어쓰기) */
+function confirmSaveCropPreset(){
+  const input=document.getElementById('pcSaveName');
+  const name=(input?input.value:'').trim().slice(0,PC_NAME_MAX);
+  if(!name){ toast('저장할 이름을 입력해 주세요'); if(input) input.focus(); return; }
+  closeCropSavePopup();
+  _pcSavePreset(name);
+}
+
+/** 지금 쓰는 이름에 덮어쓰기 */
+function confirmOverwriteCropPreset(){
+  const cur=_pcPresetOf(_pcState.name);
+  if(!cur) return;
+  closeCropSavePopup();
+  _pcSavePreset(cur.name);
+}
+
+/**
+ * 미리보기 위에 잘린 곳(빗금)과 남은 곳(점선·손잡이)을 그리고, 줄여 넣기면 슬라이드를 남은 곳에 맞게 줄인다.
+ * 송출 화면(screen.html fitStage)과 같은 계산이므로 미리보기가 곧 송출 모양이다.
+ */
+function _pcRenderOverlay(){
+  const pv=document.getElementById('lbPv');
+  if(!pv) return;
+  const c=_pcEff(), s=_pcState;
+  // 잘린 곳은 송출 화면에 실제로 적용되는 값으로 (자르기를 끄면 없음)
+  pv.querySelectorAll('.pcCut').forEach(el=>{
+    const e=el.dataset.e, v=c[e];
+    if(!(v>0)){ el.style.display='none'; return; }
+    el.style.display='block';
+    if(e==='t'||e==='b'){
+      el.style.left='0'; el.style.right='0'; el.style.width=''; el.style.height=v+'%';
+      el.style.top=e==='t'?'0':''; el.style.bottom=e==='b'?'0':'';
+    }else{
+      el.style.top=c.t+'%'; el.style.bottom=c.b+'%'; el.style.height=''; el.style.width=v+'%';
+      el.style.left=e==='l'?'0':''; el.style.right=e==='r'?'0':'';
+    }
+  });
+  // 남은 곳의 테두리·손잡이는 꺼 두었어도 저장된 값 자리에 보인다 ([화면 자르기] 탭에서만)
+  const fr=document.getElementById('pcFrame');
+  if(fr){ fr.style.top=s.t+'%'; fr.style.bottom=s.b+'%'; fr.style.left=s.l+'%'; fr.style.right=s.r+'%'; }
+  // 줄여 넣기: 슬라이드 전체를 남은 곳 안 가운데에 맞춘다
+  const scr=document.getElementById('lbPvScreen');
+  if(scr){
+    const vw=1-(c.l+c.r)/100, vh=1-(c.t+c.b)/100;
+    if(c.fit&&(vw<1||vh<1)){
+      const k=Math.min(vw,vh), x=c.l/100+(vw-k)/2, y=c.t/100+(vh-k)/2;
+      scr.style.transform='translate('+(x*100)+'%,'+(y*100)+'%) scale('+k+')';
+    }else{
+      scr.style.transform='';
+    }
+  }
+}
+
+// 화면 자르기 이벤트 연결 (미리보기 손잡이 끌기, 슬라이더·숫자 칸, 켜기·끄기)
+(function(){
+  const pv=document.getElementById('lbPv');
+  // 미리보기의 점선(손잡이)을 끌어서 자르기
+  if(pv) pv.addEventListener('pointerdown',e=>{
+    const h=e.target.closest('.pcHandle');
+    if(!h||e.button!==0||_lbState.panel.tab!=='crop') return;
+    e.preventDefault();
+    e.stopPropagation();
+    const edge=h.dataset.e;
+    h.classList.add('drag');
+    try{ h.setPointerCapture(e.pointerId); }catch(err){}
+    const mv=ev=>{
+      if(!(ev.buttons&1)){ up(); return; }   // 창 밖에서 손을 뗀 경우
+      const r=pv.getBoundingClientRect();
+      const x0=r.left+pv.clientLeft, y0=r.top+pv.clientTop, w=pv.clientWidth, hh=pv.clientHeight;
+      if(w<10||hh<10) return;
+      const v=edge==='t'?(ev.clientY-y0)/hh
+        : edge==='b'?(y0+hh-ev.clientY)/hh
+        : edge==='l'?(ev.clientX-x0)/w
+        : (x0+w-ev.clientX)/w;
+      _pcSetEdge(edge,v*100);
+    };
+    const up=()=>{
+      h.removeEventListener('pointermove',mv);
+      h.removeEventListener('pointerup',up);
+      h.removeEventListener('pointercancel',up);
+      try{ h.releasePointerCapture(e.pointerId); }catch(err){}
+      h.classList.remove('drag');
+      saveOutputCrop();
+    };
+    h.addEventListener('pointermove',mv);
+    h.addEventListener('pointerup',up);
+    h.addEventListener('pointercancel',up);
+  });
+
+  PC_EDGES.forEach(e=>{
+    // 슬라이더: 움직이는 동안 바로 반영. 손을 떼면 포커스를 놓아 방향키·숫자키가 다시 슬라이드 조작으로 가게 한다
+    const r=document.getElementById('pcR_'+e);
+    if(r){
+      r.addEventListener('input',()=>_pcSetEdge(e,r.value));
+      r.addEventListener('change',()=>{ saveOutputCrop(); r.blur(); });
+      r.addEventListener('pointerup',()=>setTimeout(()=>r.blur(),0));
+      r.addEventListener('dblclick',()=>{ _pcSetEdge(e,0); r.blur(); });
+    }
+    // 숫자 칸: 치는 대로 반영, Enter로 마치고 Esc로 되돌린다
+    const n=document.getElementById('pcN_'+e);
+    if(n){
+      n.addEventListener('focus',()=>{ n._before={v:_pcState[e],on:_pcState.on}; });
+      n.addEventListener('input',()=>{
+        if(n.value.trim()!==''&&Number.isFinite(Number(n.value))) _pcSetEdge(e,n.value);
+      });
+      n.addEventListener('change',()=>{
+        _pcSetEdge(e,n.value.trim()===''?0:n.value);
+        n.value=_pcFmt(_pcState[e]);
+        saveOutputCrop();
+      });
+      n.addEventListener('keydown',ev=>{
+        if(ev.key==='Enter'){ ev.preventDefault(); n.blur(); }
+        else if(ev.key==='Escape'){
+          ev.preventDefault();
+          if(n._before){ _pcState[e]=n._before.v; _pcState.on=n._before.on; _pcChanged(); }
+          n.value=_pcFmt(_pcState[e]);
+          n.blur();
+        }
+      });
+    }
+  });
+
+  const on=document.getElementById('pcOn');
+  if(on) on.addEventListener('change',()=>{ setOutputCropOn(on.checked); on.blur(); });
+
+  // 이름 붙여 저장 창: 치는 동안 같은 이름이 있는지 알려 주고, Enter 저장 · Esc 닫기
+  const nameIn=document.getElementById('pcSaveName');
+  if(nameIn){
+    nameIn.addEventListener('input',_pcSaveNameCheck);
+    nameIn.addEventListener('keydown',ev=>{
+      // 한글 조합 중에 누른 Enter도 바로 저장한다 (조합 중인 글자도 값에 들어 있다. 레이아웃 저장 창과 같음)
+      if(ev.key==='Enter'){ if(!ev.isComposing) ev.preventDefault(); confirmSaveCropPreset(); }
+      else if(ev.key==='Escape'){ ev.preventDefault(); closeCropSavePopup(); }
+    });
+  }
+  // 창 밖을 누르면 닫고, 한 번 누른 ✕(삭제 대기)도 풀어 준다.
+  // pointerdown을 먼저(capture) 받는다: 제목 줄·손잡이는 pointerdown을 막아 mousedown이 오지 않는다
+  document.addEventListener('pointerdown',e=>{
+    const pop=document.getElementById('pcSavePopup'), btn=document.getElementById('pcSaveBtn');
+    if(pop&&pop.classList.contains('open')&&!pop.contains(e.target)&&!(btn&&btn.contains(e.target))) closeCropSavePopup();
+    if(_pcDelArm&&!(e.target.closest&&e.target.closest('.pcChip.arm .pcChipDel'))) _pcDisarmDel();
+  },true);
+  // 패널을 옮기거나 창 크기가 바뀌면 저장 창은 닫는다 (자리가 어긋나므로)
+  document.getElementById('lbHead')?.addEventListener('pointerdown',closeCropSavePopup);
+  window.addEventListener('resize',closeCropSavePopup);
+  document.getElementById('liveBgPanel')?.addEventListener('scroll',closeCropSavePopup);
+  document.getElementById('rpanel')?.addEventListener('scroll',closeCropSavePopup);
 })();
 
 // ──────────── GROUP MODAL ────────────
@@ -9002,6 +10039,8 @@ function _applyOutVideoState(st) {
   if (st) _lastOutVidState = { ...st, recv: Date.now() }
   if (!st || !screenOpen) return
   if (_vidSyncDragging || Date.now() < _vidSyncHoldUntil) return
+  // 송출 화면이 전환하는 동안에는 미리보기 영상을 열거나 옮기지 않는다 (_holdPreviewVideo가 끝나면 시작)
+  if (_previewVideoHoldMs() > 0) return
   const vid = _getPreviewVid()
   if (!vid || !vid.duration || vid.readyState < 1) return
   // 미리보기와 송출이 같은 영상일 때만 맞춘다
@@ -12435,6 +13474,7 @@ if(window.electronAPI && typeof window.electronAPI.onOutputControl === 'function
   const loaded=loadProject();
   loadKeyBindings();
   loadLiveBg();
+  loadOutputCrop();
 
   // 저장된 레이아웃에서 "가사" 레이블 텍스트 박스 일괄 제거
   (function cleanLyricsBboxFromLayouts(){
@@ -12632,7 +13672,7 @@ function toggleExpand(){
   const isExpanded = ws.classList.toggle('expanded');
   localStorage.setItem('panelExpanded', isExpanded ? '1' : '0');
   _updateExpandBtn();
-  // 오른쪽 패널에 넣어 둔 배경 컨트롤은 패널이 숨겨진 동안 떠 있는 창으로 보인다
+  // 오른쪽 패널에 넣어 둔 프로젝터 설정은 패널이 숨겨진 동안 떠 있는 창으로 보인다
   if(_lbState.panel.open) _lbApplyDock();
 }
 
@@ -12658,10 +13698,11 @@ function _curSlideMarker() {
   return { sl, on: sl ? sl.markerLineOn === true : false, y: sl ? (sl.markerLineY ?? 50) : 50 };
 }
 
-function _sendMarkerLine() {
+/** 마커 선 상태를 송출 화면에 보낸다. to: 그 송출 화면에만 (없으면 모두) */
+function _sendMarkerLine(to) {
   if(!window.electronAPI || !window.electronAPI.sendMarkerLine) return;
   const { on, y } = _curSlideMarker();
-  window.electronAPI.sendMarkerLine({ visible: on, y });
+  window.electronAPI.sendMarkerLine({ visible: on, y }, to);
 }
 
 function _syncMarkerLine() {

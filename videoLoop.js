@@ -347,7 +347,8 @@
         st.native = true
         a.loop = true
       }
-      if (!st.native && st.phase === 'idle' && !st.mirroring && !a.paused) {
+      // 재생 속도 0은 화면에서 사라진 채 세워 둔 영상 (송출 화면 _parkOrPause) — 반복 준비를 하지 않는다
+      if (!st.native && st.phase === 'idle' && !st.mirroring && !a.paused && a.playbackRate > 0) {
         if (!st.twin && known && performance.now() >= st.twinAt && a.currentTime >= dur - st.lead() - TWIN_AHEAD) ensureTwin()
         // 남은 시간이 '시작에 걸리는 시간'(페이드 반복이면 페이드 시간)보다 짧아지면 다음 주자를 출발시킨다
         if (known && !a.seeking && !st.isFollower() && a.currentTime >= dur - st.lead()) beginRelay()

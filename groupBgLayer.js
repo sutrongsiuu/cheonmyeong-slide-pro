@@ -9,13 +9,17 @@
  *                   다른 영상이면 새 영상의 첫 화면이 준비된 뒤 fd초 동안 서서히 나타난다.
  *  hide(fd)       : 따로 배경을 넣은 슬라이드로 넘어갈 때. fd초 동안 사라진 뒤 일시정지한다.
  *                   (다시 show 하면 멈춘 위치부터 이어서 재생)
+ *                   opts.park(video, key)가 true면 멈추는 대신 재생 속도 0으로 세워 둔다 (디코더를 내리지 않아 바로 이어진다)
+ *  release()      : 숨어 있는 영상을 완전히 내린다 (곧 다시 쓰지 않을 때)
  *
  * z-index: 평소 0 (두 슬라이드 레이어 아래). 사라지는 동안만 1로 올려, 같은 z-index 1인
  *          '다음 슬라이드 레이어' 위에서 함께 페이드아웃되게 한다. (컨테이너는 LB 뒤에 위치해야 함)
  *
  * spec = { key, url, fit, audio, loop, loopMode, loopFade, autoPlay }
  * opts = { takeVideo(spec) → 미리 디코딩해 둔 <video>, isFollower(video), onAwaitPlay(video, spec),
- *          seamless: false 면 보통 반복은 브라우저 기본 반복 (편집 미리보기: 디코더를 아낀다) }
+ *          seamless: false 면 보통 반복은 브라우저 기본 반복 (편집 미리보기: 디코더를 아낀다),
+ *          park(video, key) → 숨길 때 세워 둘지,
+ *          holdMs() → 새 영상을 열기 전에 기다릴 시간(ms), posterOf(url) → 그동안 보여 줄 썸네일 (편집 미리보기: 송출 전환 중) }
  *
  * 반복 재생은 VideoLoop의 이어달리기를 쓰므로 영상 하나가 <video> 두 개로 번갈아 재생될 수 있다.
  * cur.video 는 그 영상을 대표하는 요소이고, 지금 재생 중인 요소는 act(cur.video)로 얻는다.
@@ -93,6 +97,7 @@
         cur.spec = spec
         all(cur.video).forEach(x => { x.style.objectFit = spec.fit || 'cover' })
         const a = act(cur.video)
+        if (a.playbackRate === 0) a.playbackRate = 1   // 숨길 때 세워 둔 영상 (opts.park)
         if (a.paused && !a.ended && (spec.autoPlay !== false || cur.started)) startPlay(a, spec)
         else a.muted = !spec.audio
         return a
@@ -101,12 +106,28 @@
       // 새 영상
       const old = cur
       let v = makeVideo(spec)
+      // 기다려야 하면(opts.holdMs) 열지 않고 썸네일만 보여 두었다가 시작한다
+      const hold = (spec.autoPlay !== false && opts.holdMs) ? opts.holdMs() : 0
+      if (hold > 0) {
+        v.preload = 'none'
+        const th = opts.posterOf ? opts.posterOf(spec.url) : ''
+        if (th) v.poster = th
+      }
       container.appendChild(v)
       v = attachLoop(v, spec)
       cur = { key: spec.key, video: v, spec, sig: sigOf(spec), started: false }
       if (spec.autoPlay !== false) {
         cur.started = true
-        startPlay(v, spec)
+        if (hold > 0) {
+          setTimeout(() => {
+            // 그 사이 다른 영상으로 바뀌었거나 숨었으면 그대로 둔다 (다시 보일 때 show가 재생한다)
+            if (!cur || cur.video !== v || !v.isConnected || !visible) return
+            v.preload = 'auto'
+            startPlay(v, spec)
+          }, hold + 20)
+        } else {
+          startPlay(v, spec)
+        }
       } else {
         v.muted = !spec.audio
         v.addEventListener('play', () => { if (cur && cur.video === v) cur.started = true }, { once: true })
@@ -121,7 +142,8 @@
           // 그동안 이전 영상은 아래에서 계속 재생되고, 새 영상이 다 나타나면 정리한다.
           retiring.push(old.video)
           v.style.opacity = '0'
-          const ready = (window.VideoLoop && VideoLoop.whenFrame) ? VideoLoop.whenFrame(v, 700) : Promise.resolve()
+          // 썸네일만 보여 두는 동안이면 첫 화면을 기다리지 않는다
+          const ready = (hold <= 0 && window.VideoLoop && VideoLoop.whenFrame) ? VideoLoop.whenFrame(v, 700) : Promise.resolve()
           ready.then(() => {
             if (!cur || cur.video !== v) return   // 그 사이 또 다른 영상으로 바뀜 → 그쪽이 이어받아 정리한다
             v.style.transition = 'opacity ' + fd + 's ease-in-out'
@@ -146,12 +168,22 @@
       visible = false
       clearHide()
       const v = cur && cur.video
+      const key = cur && cur.key
       const done = () => {
         hideTimer = null
         container.style.transition = 'none'
         container.style.opacity = '0'
         container.style.zIndex = '0'
-        if (v) { try { act(v).pause() } catch (e) {} }
+        if (!v) return
+        const a = act(v)
+        // 곧 다시 쓸 영상이면 재생 속도 0으로 세워 둔다 (반복 전환 중이면 그냥 멈춘다)
+        const busy = window.VideoLoop && VideoLoop.busy(v)
+        if (opts.park && !a.paused && !a.ended && !busy && opts.park(a, key)) {
+          a.muted = true
+          a.playbackRate = 0
+        } else {
+          try { a.pause() } catch (e) {}
+        }
       }
       if (fd > 0) {
         container.style.zIndex = '1'
@@ -166,9 +198,19 @@
       }
     }
 
+    /** 숨어 있는 영상을 완전히 내린다 (보이는 중이면 그대로) */
+    function release(){
+      if (visible || hideTimer || !cur) return
+      removeVideo(cur.video)
+      retiring.forEach(removeVideo)
+      retiring = []
+      cur = null
+    }
+
     return {
       show,
       hide,
+      release,
       active: () => visible && !!cur,
       /** 지금 보이며 재생 중인 요소 */
       video: () => (visible && cur) ? act(cur.video) : null,
