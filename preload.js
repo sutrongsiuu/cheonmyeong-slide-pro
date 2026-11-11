@@ -165,7 +165,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   // 화면 자르기: 편집 창의 프로젝터 설정 → 그 송출 화면 (송출 화면마다 따로)
   // id: 송출 화면의 모니터 id
-  // crop: { t, r, b, l: 위·오른쪽·아래·왼쪽에서 자를 만큼(슬라이드 크기의 %), fit: 남은 곳에 슬라이드 전체를 줄여 넣기 }
+  // crop: { t, r, b, l: 위·오른쪽·아래·왼쪽에서 자를 만큼(슬라이드 크기의 %), fit: 남은 곳에 슬라이드 전체를 줄여 넣기, z: 크기(%), x·y: 위치(%) }
   sendOutputCrop: (id, crop) => ipcRenderer.send("output-crop", id, crop),
   onOutputCrop: (cb) => registerSingleListener("output-crop", cb),
   removeOutputCropListener: () => unregisterSingleListener("output-crop"),

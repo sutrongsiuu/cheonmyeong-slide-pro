@@ -696,6 +696,7 @@ pointer-events:all;
 #SCM.sm-mode-edit .sm-hide-on-edit{display:none!important;}
 #SM.sm-mode-edit .sm-hide-on-edit{display:none!important;}
 #SM:not(.sm-mode-edit) .sm-show-on-edit{display:none!important;}
+#SM.sm-multi-edit .sm-hide-on-multi{display:none!important;}
 /* 텍스트 추가 패널 */
 #addTbPanel{position:fixed;z-index:300;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px 22px;width:340px;max-width:96vw;box-shadow:0 8px 40px rgba(0,0,0,.6);display:none;}
 #addTbPanel.show{display:block;}
@@ -736,6 +737,7 @@ pointer-events:all;
 .lbPvMedia{position:absolute;inset:0;}
 /* 페이드 반복 영상은 같은 영상 두 개를 겹쳐 번갈아 재생하므로 모두 같은 자리에 겹쳐 놓는다 */
 .lbPvMedia>img,.lbPvMedia>video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;}
+.lbPvMedia>.vThumbWait{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:28px;}
 /* 지금 슬라이드의 글자: 편집 미리보기에 그려진 글자를 복사해 같은 비율로 줄여 겹친다 (밝기는 배경에만) */
 .lbPvText{position:absolute;inset:0;overflow:hidden;pointer-events:none;}
 .lbPvTextFrame{position:absolute;left:0;top:0;transform-origin:0 0;}
@@ -743,7 +745,7 @@ pointer-events:all;
 .lbPvEmpty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--text-muted);}
 .lbPvTag{position:absolute;left:6px;top:6px;z-index:5;padding:2px 8px;border-radius:10px;background:rgba(0,0,0,.6);color:#fff;font-size:12px;font-weight:600;white-space:nowrap;pointer-events:none;}
 #liveBgPanel.tab-crop .lbPvTag{display:none;}
-/* 화면 자르기: 미리보기도 송출 화면처럼 잘린 곳(빗금)을 덮고, 줄여 넣기면 슬라이드(.lbPvScreen)를 남은 곳에 맞게 줄인다.
+/* 화면 자르기: 미리보기도 송출 화면처럼 잘린 곳(빗금)을 덮고, 크기·위치대로 슬라이드(.lbPvScreen)를 옮긴다.
    [화면 자르기] 탭에서는 남은 곳의 테두리(점선)와 끌 수 있는 손잡이를 보인다 */
 .lbPvScreen{position:absolute;inset:0;transform-origin:0 0;}
 .pcShade{position:absolute;inset:0;z-index:3;pointer-events:none;}
@@ -820,17 +822,19 @@ pointer-events:all;
 .pcNum:focus{outline:none;border-color:var(--accent);}
 /* 위아래 화살표 단추는 숨긴다 ('12.5'가 잘리지 않게). 방향키로는 0.1씩 바뀐다 */
 .pcNum::-webkit-inner-spin-button,.pcNum::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;}
+.pcZoomRow{margin-top:2px;padding-top:7px;border-top:1px solid var(--border2);}
+/* [화면 자르기] 탭에서는 미리보기를 끌어 위치를 옮긴다 */
+#liveBgPanel.tab-crop .lbPv{cursor:move;touch-action:none;}
 .pcUnit{width:12px;flex-shrink:0;font-size:12px;color:var(--text-muted);}
-/* 켜기·초기화, 잘라 내기 / 줄여 넣기, 설명 */
+/* 줄마다 원래대로(↺): 크기·좌우·상하. 자르기 줄은 같은 너비의 빈칸으로 슬라이더 끝을 맞춘다 */
+.pcRowReset{width:26px;height:26px;flex-shrink:0;padding:0;border:1px solid var(--border);border-radius:5px;background:transparent;color:var(--text-dim);font-size:14px;line-height:1;cursor:pointer;}
+.pcRowReset:hover{color:var(--text);border-color:var(--accent);}
+.pcRowGap{visibility:hidden;}
+/* 켜기·초기화, 설명 */
 .pcSide{grid-area:side;display:flex;flex-direction:column;gap:8px;font-size:13px;color:var(--text-dim);}
 .pcTop{display:flex;align-items:center;gap:8px;}
 .pcOn{flex:1;display:flex;align-items:center;gap:6px;color:var(--text);cursor:pointer;white-space:nowrap;}
 .pcOn input{width:15px;height:15px;margin:0;accent-color:var(--accent);cursor:pointer;}
-.pcMode{display:flex;align-items:center;gap:8px;white-space:nowrap;}
-.pcModeBtns{flex:1;display:flex;gap:2px;padding:2px;border:1px solid var(--border);border-radius:6px;background:var(--bg);}
-.pcModeBtn{flex:1;height:24px;padding:0 6px;border:none;border-radius:4px;background:transparent;color:var(--text-dim);font-size:13px;font-family:'Noto Sans KR',sans-serif;cursor:pointer;white-space:nowrap;}
-.pcModeBtn:hover{color:var(--text);}
-.pcModeBtn.on{background:var(--surface2);color:var(--text);font-weight:600;box-shadow:inset 0 0 0 1px var(--accent);}
 .pcDesc{font-size:12px;color:var(--text-dim);line-height:1.5;word-break:keep-all;}
 .pcSide .lbHint{word-break:keep-all;}
 /* 송출 화면 칸: 송출할 수 있는 모니터마다 [☑ 번호 이름 해상도 •] — 누르면 그 화면의 자르기를 아래에서 고친다.
@@ -908,6 +912,8 @@ pointer-events:all;
 </head>
 <body>
   <div id="slideCtxMenu">
+    <div class="ctx-item" id="ctxEditBtn"><span class="ctx-lbl">배경 편집</span></div>
+    <div class="ctx-sep"></div>
     <div class="ctx-item" id="ctxCopyBtn"><span class="ctx-lbl">슬라이드 복사</span><span class="ctx-key">Ctrl+C</span></div>
     <div class="ctx-item" id="ctxPasteBtn"><span class="ctx-lbl">붙여넣기</span><span class="ctx-key">Ctrl+V</span></div>
     <div class="ctx-sep"></div>
@@ -1285,25 +1291,23 @@ pointer-events:all;
       </div>
       <!-- 화면 자르기: 위·아래·왼쪽·오른쪽에서 자를 만큼 (슬라이드 크기의 %) -->
       <div class="pcEdges lbCropOnly" id="pcEdges">
-        <div class="pcRow"><span class="pcLbl">위</span><input type="range" id="pcR_t" data-e="t" min="0" max="90" step="0.1" value="0"><input type="number" class="pcNum" id="pcN_t" data-e="t" min="0" max="90" step="0.1" value="0"><span class="pcUnit">%</span></div>
-        <div class="pcRow"><span class="pcLbl">아래</span><input type="range" id="pcR_b" data-e="b" min="0" max="90" step="0.1" value="0"><input type="number" class="pcNum" id="pcN_b" data-e="b" min="0" max="90" step="0.1" value="0"><span class="pcUnit">%</span></div>
-        <div class="pcRow"><span class="pcLbl">왼쪽</span><input type="range" id="pcR_l" data-e="l" min="0" max="90" step="0.1" value="0"><input type="number" class="pcNum" id="pcN_l" data-e="l" min="0" max="90" step="0.1" value="0"><span class="pcUnit">%</span></div>
-        <div class="pcRow"><span class="pcLbl">오른쪽</span><input type="range" id="pcR_r" data-e="r" min="0" max="90" step="0.1" value="0"><input type="number" class="pcNum" id="pcN_r" data-e="r" min="0" max="90" step="0.1" value="0"><span class="pcUnit">%</span></div>
+        <div class="pcRow"><span class="pcLbl">위</span><input type="range" id="pcR_t" data-e="t" min="0" max="90" step="0.1" value="0"><input type="number" class="pcNum" id="pcN_t" data-e="t" min="0" max="90" step="0.1" value="0"><span class="pcUnit">%</span><span class="pcRowReset pcRowGap" aria-hidden="true"></span></div>
+        <div class="pcRow"><span class="pcLbl">아래</span><input type="range" id="pcR_b" data-e="b" min="0" max="90" step="0.1" value="0"><input type="number" class="pcNum" id="pcN_b" data-e="b" min="0" max="90" step="0.1" value="0"><span class="pcUnit">%</span><span class="pcRowReset pcRowGap" aria-hidden="true"></span></div>
+        <div class="pcRow"><span class="pcLbl">왼쪽</span><input type="range" id="pcR_l" data-e="l" min="0" max="90" step="0.1" value="0"><input type="number" class="pcNum" id="pcN_l" data-e="l" min="0" max="90" step="0.1" value="0"><span class="pcUnit">%</span><span class="pcRowReset pcRowGap" aria-hidden="true"></span></div>
+        <div class="pcRow"><span class="pcLbl">오른쪽</span><input type="range" id="pcR_r" data-e="r" min="0" max="90" step="0.1" value="0"><input type="number" class="pcNum" id="pcN_r" data-e="r" min="0" max="90" step="0.1" value="0"><span class="pcUnit">%</span><span class="pcRowReset pcRowGap" aria-hidden="true"></span></div>
+        <div class="pcRow pcZoomRow" title="송출 화면의 슬라이드를 확대·축소 (100%: 원래 크기, 더블클릭: 100%)"><span class="pcLbl">크기</span><input type="range" id="pcR_z" data-e="z" min="50" max="200" step="1" value="100" list="pcZoomTicks"><input type="number" class="pcNum" id="pcN_z" data-e="z" min="50" max="200" step="1" value="100"><span class="pcUnit">%</span><button class="pcRowReset" type="button" onclick="resetOutputCropPart('z');this.blur()" title="크기를 원래대로 (100%)">↺</button></div>
+        <div class="pcRow" title="송출 화면의 슬라이드를 왼쪽(−)·오른쪽(+)으로 옮기기 (0: 가운데, 더블클릭: 0) · 미리보기를 끌어서 옮겨도 됩니다"><span class="pcLbl">좌우</span><input type="range" id="pcR_x" data-e="x" min="-50" max="50" step="0.1" value="0" list="pcPosTicks"><input type="number" class="pcNum" id="pcN_x" data-e="x" min="-50" max="50" step="0.1" value="0"><span class="pcUnit">%</span><button class="pcRowReset" type="button" onclick="resetOutputCropPart('x');this.blur()" title="좌우 위치를 원래대로 (가운데)">↺</button></div>
+        <div class="pcRow" title="송출 화면의 슬라이드를 위(−)·아래(+)로 옮기기 (0: 가운데, 더블클릭: 0) · 미리보기를 끌어서 옮겨도 됩니다"><span class="pcLbl">상하</span><input type="range" id="pcR_y" data-e="y" min="-50" max="50" step="0.1" value="0" list="pcPosTicks"><input type="number" class="pcNum" id="pcN_y" data-e="y" min="-50" max="50" step="0.1" value="0"><span class="pcUnit">%</span><button class="pcRowReset" type="button" onclick="resetOutputCropPart('y');this.blur()" title="상하 위치를 원래대로 (가운데)">↺</button></div>
+        <datalist id="pcZoomTicks"><option value="100"></option></datalist>
+        <datalist id="pcPosTicks"><option value="0"></option></datalist>
       </div>
       <div class="pcSide lbCropOnly">
         <div class="pcTop">
           <label class="pcOn" title="끄면 자른 값은 그대로 두고 송출 화면만 원래대로 보입니다"><input type="checkbox" id="pcOn" checked>자르기 사용</label>
-          <button class="lbBrightReset" type="button" onclick="resetOutputCrop();this.blur()" title="위·아래·왼쪽·오른쪽을 모두 0%로">초기화</button>
-        </div>
-        <div class="pcMode">
-          <span>슬라이드</span>
-          <div class="pcModeBtns">
-            <button class="pcModeBtn" id="pcModeCut" type="button" onclick="setOutputCropFit(false);this.blur()" title="슬라이드는 그대로 두고 잘린 가장자리만 검게">잘라 내기</button>
-            <button class="pcModeBtn" id="pcModeFit" type="button" onclick="setOutputCropFit(true);this.blur()" title="슬라이드 전체를 남은 곳에 맞게 줄이기">줄여 넣기</button>
-          </div>
+          <button class="lbBrightReset" type="button" onclick="resetOutputCrop();this.blur()" title="위·아래·왼쪽·오른쪽을 모두 0%로, 크기는 100%로">초기화</button>
         </div>
         <div class="pcDesc" id="pcDesc"></div>
-        <span class="lbHint">미리보기의 점선을 끌어도 됩니다</span>
+        <span class="lbHint">미리보기에서 점선을 끌면 자르기, 화면을 끌면 위치</span>
       </div>
       <!-- 저장된 자르기: 칩을 누르면 그 값으로 자르고, [＋ 저장]으로 이름 붙여 저장·덮어쓰기 -->
       <div class="pcPresets lbCropOnly">
@@ -1754,7 +1758,7 @@ pointer-events:all;
   <div class="mback" id="SM">
     <div class="mbox">
       <h3 id="SMtitle">슬라이드 편집</h3>
-      <div class="fr sm-show-on-edit">
+      <div class="fr sm-show-on-edit sm-hide-on-multi">
         <label>슬라이드 이름</label>
         <input id="SMslideName" type="text" placeholder="슬라이드 이름 (선택 사항)">
       </div>
@@ -2894,6 +2898,7 @@ if(document.readyState==='loading'){
   const pasteBtn=document.getElementById('ctxPasteBtn');
   const copyBtn=document.getElementById('ctxCopyBtn');
   const dupBtn=document.getElementById('ctxDuplicateBtn');
+  const editBtn=document.getElementById('ctxEditBtn');
   // 우클릭한 슬라이드가 다중 선택에 포함되어 있으면 선택 전체를 대상으로 한다 (화면 순서).
   function _ctxTargetIds(){
     if(!_ctxSlideId) return [];
@@ -2909,6 +2914,11 @@ if(document.readyState==='loading'){
     const ids=_ctxTargetIds();
     hideSlideCtxMenu();
     if(ids.length) pasteSlides(ids[ids.length-1]);   // 선택의 마지막 슬라이드 바로 다음에 삽입
+  });
+  editBtn.addEventListener('click',()=>{
+    const id=_ctxSlideId;
+    hideSlideCtxMenu();
+    if(id) openSM(id);                               // 다중 선택 안이면 선택 전체 배경을 함께 편집
   });
   dupBtn.addEventListener('click',()=>{
     const ids=_ctxTargetIds();
@@ -2927,6 +2937,7 @@ if(document.readyState==='loading'){
     const selCnt=(slideId && _selectedIds.has(slideId)) ? _selectedIds.size : 1;
     copyBtn.querySelector('.ctx-lbl').textContent=selCnt>1?('슬라이드 복사 ('+selCnt+'장)'):'슬라이드 복사';
     dupBtn.querySelector('.ctx-lbl').textContent=selCnt>1?('선택 다음에 복제 ('+selCnt+'장)'):'슬라이드 복제';
+    editBtn.querySelector('.ctx-lbl').textContent=selCnt>1?('배경 편집 ('+selCnt+'장)'):'배경 편집';
     menu.style.left=x+'px';
     menu.style.top=y+'px';
     menu.classList.add('show');
@@ -3070,6 +3081,7 @@ let screenOpen=false;  // 외부 송출 창이 열려 있는지 여부
 // ── 슬라이드 편집 모달 상태 ──
 let editGid=null;         // 편집 중인 그룹 id (그룹 편집 모달)
 let editSid=null;         // 편집 중인 슬라이드 id (슬라이드 편집 모달)
+let editSids=[];          // 배경을 함께 바꿀 슬라이드 id들 (다중 선택 안에서 편집을 열면 선택 전체, 아니면 editSid 하나)
 let modalTextBoxes=[];    // 편집 중인 추가 텍스트박스 임시 배열
 
 // ── 배경 미디어 ──
@@ -5364,6 +5376,8 @@ function syncScreen(to){
     up:_upcomingPayload(to),
     // 배경 컨트롤로 배경을 바꿀 때는 그 전환 시간으로 한 번 크로스페이드
     fd:(_liveBgFdOnce!=null?_liveBgFdOnce:(s.fadeSecs!=null?s.fadeSecs:getFade())),
+    // 배경 컨트롤로 배경만 바꾸는 전환: 송출 화면이 새 배경 영상이 제대로 돌기 시작할 때까지 기다렸다가 페이드한다
+    bgTake:_liveBgFdOnce!=null,
     // 배경 밝기 (1 = 원래 밝기). 송출 화면이 배경 사진·영상에만 적용한다
     bgb:_curLiveBrightness()/100
   };
@@ -7230,12 +7244,15 @@ function _lbRenderPreview(){
   const sp=_lbTargetSpec(t);
   pv.classList.toggle('live',isLive);
   pv.classList.toggle('prev',!isLive);
-  document.getElementById('lbPvTag').textContent=isLive
-    ? (screenOpen?'송출 중':'송출 시작하면 이 배경')
-    : '미리보기 · 한 번 더 누르면 송출';
   // 칸의 영상은 송출과 같이 페이드 반복으로 보여 준다 (원래 배경은 브라우저 기본 반복)
   const xfade=t!=='orig'&&!!sp&&sp.type==='video';
-  const key=sp?sp.type+'|'+(sp.type==='color'?sp.color:sp.url)+(xfade?'|xfade':''):'none';
+  // 송출 중에는 영상을 재생하지 않고 정지 화면(썸네일)만 보여 준다.
+  // 미리보기가 무거운 영상을 따로 풀면 그래픽을 함께 쓰는 송출 화면이 새 배경을 준비하는 동안·재생 중에 끊긴다
+  const still=!!sp&&sp.type==='video'&&!!screenOpen;
+  document.getElementById('lbPvTag').textContent=(isLive
+    ? (screenOpen?'송출 중':'송출 시작하면 이 배경')
+    : '미리보기 · 한 번 더 누르면 송출')+(still?' · 영상 정지 화면':'');
+  const key=sp?sp.type+'|'+(sp.type==='color'?sp.color:sp.url)+(still?'|still':xfade?'|xfade':''):'none';
   if(key!==_lbPvKey){
     _lbStopPreview();
     _lbPvKey=key;
@@ -7248,6 +7265,8 @@ function _lbRenderPreview(){
       img.decoding='async';
       img.src=sp.url;
       media.appendChild(img);
+    }else if(still){
+      media.innerHTML=videoThumbHTML(sp.url);
     }else{
       const v=document.createElement('video');
       v.src=sp.url; v.muted=true; v.playsInline=true; v.autoplay=true;
@@ -7537,12 +7556,14 @@ function _lbMenuClose(){
 
 // ──────────── 화면 자르기 (프로젝터 설정 패널의 [화면 자르기] 탭) ────────────
 // 송출 화면의 가장자리를 위·아래·왼쪽·오른쪽에서 원하는 만큼 자른다. 값은 슬라이드 크기의 %.
-//   - 잘라 내기: 슬라이드는 그대로 두고 잘린 가장자리만 검게 내보낸다
-//                (프로젝터 빛이 스크린 밖이나 가려진 곳으로 나가지 않게)
-//   - 줄여 넣기: 슬라이드 전체를 남은 곳에 맞게 줄인다 (가장자리 글자도 잘리지 않게)
+//   - 슬라이드는 그대로 두고 잘린 가장자리만 검게 내보낸다
+//     (프로젝터 빛이 스크린 밖이나 가려진 곳으로 나가지 않게). 줄여 넣기(fit)는 없앴다: 늘 false
 //   - 송출 화면(screen.html)에만 적용한다. 슬라이드·프로젝트 데이터, 편집 미리보기, PPT 내보내기는 그대로.
 //   - 이 컴퓨터에 연결한 프로젝터에 맞춘 값이므로 프로젝트가 아니라 이 컴퓨터(localStorage)에 저장한다.
 //   - 마주 보는 두 쪽(위+아래, 왼쪽+오른쪽)은 합쳐서 90%까지 자를 수 있다 (적어도 10%는 남긴다).
+//   - 크기(z): 남은 곳 가운데를 기준으로 슬라이드를 50~200% 확대·축소한다 (100%: 그대로).
+//     확대하면 넘친 가장자리는 잘리고, 축소하면 둘레가 검게 나간다.
+//   - 위치(x, y): 슬라이드를 슬라이드 크기의 %만큼 옮긴다 (−50~50, +는 오른쪽·아래). 크기를 바꾼 뒤에 옮긴다.
 //   - 장소·프로젝터마다 값을 이름 붙여 저장해 두고(저장된 자르기) 칩을 눌러 바로 바꿀 수 있다.
 //   - 송출 화면이 여럿이면(외부 모니터마다 하나씩 함께 송출) 자르기는 화면마다 따로다.
 //     탭 위쪽의 송출 화면 칸에서 고칠 화면을 고르고, 체크를 끄면 그 화면에는 송출하지 않는다.
@@ -7551,14 +7572,17 @@ const OUTPUT_CROP_STORAGE_KEY='worshipslide-pro-output-crop-v1';
 const PC_MAX_PAIR=90;
 const PC_EDGES=['t','b','l','r'];
 const PC_OPP={t:'b',b:'t',l:'r',r:'l'};
+const PC_Z_MIN=50, PC_Z_MAX=200;   // 크기(확대·축소) %
+const PC_POS_MAX=50;               // 위치를 옮길 수 있는 만큼 (슬라이드 크기의 %, 양쪽으로)
+const PC_POS=['x','y'];
 const PC_NAME_MAX=30;
 const PC_OUTS_MAX=30;   // 기억해 두는 모니터 수 (넘으면 지금 연결되지 않은 오래된 것부터 지운다)
 const PROJ_BTN_TITLE='프로젝터 설정 · 배경 컨트롤(숫자키 한 번: 미리보기, 한 번 더: 송출, 0: 원래 배경)과 화면 자르기';
-// 모니터마다 기억하는 설정: { id, label, out, on, t, b, l, r, fit, name }
+// 모니터마다 기억하는 설정: { id, label, out, on, t, b, l, r, fit, z, x, y, name }
 //   id·label: 모니터 (main.js가 알려 준 display.id와 모니터 이름). id와 이름이 같으면 같은 모니터로 본다.
 //             다른 단자에 꽂아 id가 바뀌어도 이름이 같은 기억이 하나뿐이면 그 모니터로 이어 쓴다
 //   out: 이 화면에 송출 (false면 송출을 시작해도 이 모니터에는 송출 창을 열지 않는다)
-//   on: 자르기 사용 (끄면 값은 그대로 두고 송출 화면만 원래대로), t·b·l·r: 자를 만큼(%), fit: 줄여 넣기
+//   on: 자르기 사용 (끄면 값은 그대로 두고 송출 화면만 원래대로), t·b·l·r: 자를 만큼(%), fit: 늘 false (줄여 넣기는 없앴다), z: 크기(%), x·y: 위치(%)
 //   name: 지금 값을 불러오거나 저장한 '저장된 자르기' 이름 ([＋ 저장]에서 덮어쓸 대상, 없으면 '')
 // 처음 보는 모니터는 기본값(송출함, 자르지 않음)으로 시작하고, 값을 바꾸면 그때 기억한다(_pcKeep).
 let _pcOuts=[];
@@ -7566,7 +7590,7 @@ let _pcCur=new Map();     // 지금 송출할 수 있는 모니터 id → 그 �
 let _pcSel='';            // [화면 자르기] 탭에서 고치고 있는 송출 화면 (모니터 id)
 let _pcState=_pcNewOut({id:'',label:''});  // 고치고 있는 송출 화면의 설정 (_pcCur.get(_pcSel))
 let _pcLegacy=null;       // 송출 화면이 하나뿐이던 때 저장한 자르기 값 → 처음 보는 첫 송출 화면에 이어 쓴다
-// 저장된 자르기: [{ name, t, b, l, r, fit }] — 저장한 순서대로. 같은 저장소 키에 함께 저장한다
+// 저장된 자르기: [{ name, t, b, l, r, fit, z, x, y }] — 저장한 순서대로. 같은 저장소 키에 함께 저장한다
 let _pcPresets=[];
 let _pcSaveTimer=null, _pcSendRaf=0;
 const _pcSendIds=new Set();   // 다음 화면 그리기 때 자르기 값을 보낼 송출 화면들
@@ -7577,9 +7601,13 @@ const _pcSendIds=new Set();   // 다음 화면 그리기 때 자르기 값을 �
 let _outDisplays=[];
 let _outAutoKey='';   // 송출 중 새 모니터에 송출 창을 열려고 한 화면들 (열기에 실패해도 거듭 열려고 하지 않게)
 
-function _pcNewOut(d){ return {id:d.id,label:d.label,out:true,on:true,t:0,b:0,l:0,r:0,fit:false,name:''}; }
+function _pcNewOut(d){ return {id:d.id,label:d.label,out:true,on:true,t:0,b:0,l:0,r:0,fit:false,z:100,x:0,y:0,name:''}; }
 
 function _pcClamp(v){ const n=Number(v); return Number.isFinite(n)?Math.round(Math.max(0,Math.min(PC_MAX_PAIR,n))*10)/10:0; }
+/** 크기(%): 50~200, 정수. 이상한 값(크기가 없던 때 저장한 값 등)은 100 */
+function _pcClampZ(v){ const n=Number(v); return v!=null&&v!==''&&Number.isFinite(n)?Math.round(Math.max(PC_Z_MIN,Math.min(PC_Z_MAX,n))):100; }
+/** 위치(%): −50~50, 0.1 단위. 이상한 값은 0 */
+function _pcClampP(v){ const n=Number(v); return Number.isFinite(n)?Math.round(Math.max(-PC_POS_MAX,Math.min(PC_POS_MAX,n))*10)/10:0; }
 /** 숫자 칸 표시: 5 → '5', 12.5 → '12.5' */
 function _pcFmt(v){ return String(Math.round((Number(v)||0)*10)/10); }
 /** 마주 보는 두 쪽이 합쳐서 90%를 넘으면 비율대로 줄인다 (저장된 값을 읽을 때) */
@@ -7598,7 +7626,7 @@ function _pcCleanPresets(arr){
     const name=String(p.name||'').trim().slice(0,PC_NAME_MAX);
     if(!name||seen.has(name)) return;
     seen.add(name);
-    const v={name,t:0,b:0,l:0,r:0,fit:p.fit===true};
+    const v={name,t:0,b:0,l:0,r:0,fit:false,z:_pcClampZ(p.z),x:_pcClampP(p.x),y:_pcClampP(p.y)};
     PC_EDGES.forEach(e=>{ v[e]=_pcClamp(p[e]); });
     out.push(_pcNormPairs(v));
   });
@@ -7611,7 +7639,9 @@ function _pcCleanOut(o){
   const s=_pcNewOut({id:String(o.id??''),label:String(o.label??'')});
   s.out=o.out!==false;
   s.on=o.on!==false;
-  s.fit=o.fit===true;
+  s.fit=false;   // 줄여 넣기는 없앴다 (예전에 줄여 넣기로 저장한 값도 잘라 내기로)
+  s.z=_pcClampZ(o.z);
+  PC_POS.forEach(k=>{ s[k]=_pcClampP(o[k]); });
   PC_EDGES.forEach(e=>{ s[e]=_pcClamp(o[e]); });
   _pcNormPairs(s);
   if(typeof o.name==='string'&&_pcPresets.some(p=>p.name===o.name)) s.name=o.name;
@@ -7670,7 +7700,7 @@ function _pcResolve(){
   if(_pcLegacy&&_outDisplays.length){
     const e=cur.get(_outDisplays[0].id);
     if(!_pcOuts.includes(e)){
-      ['on','t','b','l','r','fit','name'].forEach(k=>{ e[k]=_pcLegacy[k]; });
+      ['on','t','b','l','r','fit','z','x','y','name'].forEach(k=>{ e[k]=_pcLegacy[k]; });
       _pcKeep(e);
     }
     _pcLegacy=null;
@@ -7693,12 +7723,12 @@ function _pcKeep(e){
   }
 }
 
-/** 송출 화면에 실제로 적용할 값 (자르기를 끄면 모두 0). s: 그 화면의 설정 (없으면 고치고 있는 화면) */
+/** 송출 화면에 실제로 적용할 값 (자르기를 끄면 모두 0, 크기 100%, 위치 가운데). s: 그 화면의 설정 (없으면 고치고 있는 화면) */
 function _pcEff(s=_pcState){
-  return s.on?{t:s.t,r:s.r,b:s.b,l:s.l,fit:s.fit}:{t:0,r:0,b:0,l:0,fit:false};
+  return s.on?{t:s.t,r:s.r,b:s.b,l:s.l,fit:s.fit,z:s.z,x:s.x,y:s.y}:{t:0,r:0,b:0,l:0,fit:false,z:100,x:0,y:0};
 }
-/** 그 송출 화면을 자르고 있는지 (s 없으면 고치고 있는 화면) */
-function _pcActive(s=_pcState){ return s.on&&(s.t>0||s.b>0||s.l>0||s.r>0); }
+/** 그 송출 화면을 자르거나 크기·위치를 바꾸고 있는지 (s 없으면 고치고 있는 화면) */
+function _pcActive(s=_pcState){ return s.on&&(s.t>0||s.b>0||s.l>0||s.r>0||s.z!==100||s.x!==0||s.y!==0); }
 /** 지금 연결된 송출 화면 중 하나라도 자르고 있는지 */
 function _pcActiveAny(){ return [..._pcCur.values()].some(s=>_pcActive(s)); }
 
@@ -7833,9 +7863,31 @@ function _pcSetEdge(e,v){
   _pcChanged();
 }
 
-/** 잘라 내기(false) / 줄여 넣기(true) */
-function setOutputCropFit(fit){
-  _pcState.fit=!!fit;
+/** 크기(확대·축소 %)를 바꾼다. 자르기를 꺼 둔 채 바꾸면 다시 켠다 */
+function _pcSetZoom(v){
+  const n=_pcClampZ(v);
+  if(n===_pcState.z&&_pcState.on){ _pcRender(); return; }
+  _pcState.z=n;
+  _pcState.on=true;
+  _pcChanged();
+}
+
+/** 위치(x: 좌우, y: 상하, %)를 바꾼다. 자르기를 꺼 둔 채 바꾸면 다시 켠다 */
+function _pcSetPos(k,v){
+  if(!PC_POS.includes(k)) return;
+  const n=_pcClampP(v);
+  if(n===_pcState[k]&&_pcState.on){ _pcRender(); return; }
+  _pcState[k]=n;
+  _pcState.on=true;
+  _pcChanged();
+}
+
+/** 줄마다 원래대로(↺): 크기(z) 100%, 좌우(x)·상하(y) 0. 다른 값과 자르기 켜기·끄기는 그대로 */
+function resetOutputCropPart(k){
+  if(k!=='z'&&!PC_POS.includes(k)) return;
+  const base=k==='z'?100:0;
+  if(_pcState[k]===base) return;
+  _pcState[k]=base;
   _pcChanged();
 }
 
@@ -7845,9 +7897,11 @@ function setOutputCropOn(on){
   _pcChanged();
 }
 
-/** [초기화] 네 쪽 모두 0% */
+/** [초기화] 네 쪽 모두 0%, 크기 100%, 위치 가운데 */
 function resetOutputCrop(){
   PC_EDGES.forEach(e=>{ _pcState[e]=0; });
+  _pcState.z=100;
+  _pcState.x=0; _pcState.y=0;
   _pcChanged();
   toast(_outDisplays.length>1
     ? _outLabel(_pcSel)+' 자르기 초기화 · 이 화면은 자르지 않습니다'
@@ -7869,21 +7923,20 @@ function _pcRender(){
   _pcRenderOverlay();
   if(_lbState.panel.tab!=='crop') return;
   _pcRenderOuts();
-  PC_EDGES.forEach(e=>{
+  [...PC_EDGES,'z',...PC_POS].forEach(e=>{
     const r=document.getElementById('pcR_'+e), n=document.getElementById('pcN_'+e);
     if(r) r.value=String(_pcState[e]);
     if(n&&document.activeElement!==n) n.value=_pcFmt(_pcState[e]);
   });
   const on=document.getElementById('pcOn');
   if(on) on.checked=_pcState.on;
-  document.getElementById('pcModeCut')?.classList.toggle('on',!_pcState.fit);
-  document.getElementById('pcModeFit')?.classList.toggle('on',_pcState.fit);
   const desc=document.getElementById('pcDesc');
   if(desc) desc.textContent=!_pcState.on
     ? '자르기를 껐습니다 · 송출 화면을 자르지 않고 그대로 내보냅니다'
-    : _pcState.fit
-      ? '슬라이드 전체를 남은 곳에 맞게 줄입니다 · 글자가 잘리지 않습니다'
-      : '슬라이드는 그대로, 잘린 가장자리만 검게 나갑니다';
+    : '슬라이드는 그대로, 잘린 가장자리만 검게 나갑니다'
+      +(_pcState.z>100?' · '+_pcState.z+'%로 확대해 넘친 가장자리는 잘립니다'
+        :_pcState.z<100?' · '+_pcState.z+'%로 축소해 둘레는 검게 나갑니다':'')
+      +(_pcState.x||_pcState.y?' · 위치를 옮겼습니다':'');
   _pcRenderPresets();
 }
 
@@ -7953,7 +8006,7 @@ function _pcPresetOf(name){ return (name&&_pcPresets.find(p=>p.name===name))||nu
 /** 지금 값이 그 저장된 자르기와 같은지 */
 function _pcSameAs(p){
   const s=_pcState;
-  return !!p&&PC_EDGES.every(e=>p[e]===s[e])&&p.fit===s.fit;
+  return !!p&&PC_EDGES.every(e=>p[e]===s[e])&&p.fit===s.fit&&p.z===s.z&&p.x===s.x&&p.y===s.y;
 }
 
 /** 저장된 자르기를 불러와 바로 자른다 (자르기를 꺼 두었으면 켠다) */
@@ -7962,6 +8015,8 @@ function applyCropPreset(name){
   if(!p) return;
   PC_EDGES.forEach(e=>{ _pcState[e]=p[e]; });
   _pcState.fit=p.fit;
+  _pcState.z=p.z;
+  _pcState.x=p.x; _pcState.y=p.y;
   _pcState.on=true;
   _pcState.name=p.name;
   _pcChanged();
@@ -7970,7 +8025,7 @@ function applyCropPreset(name){
 
 /** 지금 값을 그 이름으로 저장한다. 같은 이름이 있으면 그 자리에 덮어쓴다 */
 function _pcSavePreset(name){
-  const v={name,t:_pcState.t,b:_pcState.b,l:_pcState.l,r:_pcState.r,fit:_pcState.fit};
+  const v={name,t:_pcState.t,b:_pcState.b,l:_pcState.l,r:_pcState.r,fit:_pcState.fit,z:_pcState.z,x:_pcState.x,y:_pcState.y};
   const i=_pcPresets.findIndex(p=>p.name===name);
   if(i>=0) _pcPresets[i]=v;
   else _pcPresets.push(v);
@@ -8030,7 +8085,7 @@ function _pcRenderPresets(){
     const cur=p.name===_pcState.name, mod=cur&&!_pcSameAs(p), arm=_pcDelArm===p.name;
     const chip=document.createElement('div');
     chip.className='pcChip'+(cur?' on':'')+(arm?' arm':'');
-    const desc='위 '+_pcFmt(p.t)+'% · 아래 '+_pcFmt(p.b)+'% · 왼쪽 '+_pcFmt(p.l)+'% · 오른쪽 '+_pcFmt(p.r)+'% · '+(p.fit?'줄여 넣기':'잘라 내기');
+    const desc='위 '+_pcFmt(p.t)+'% · 아래 '+_pcFmt(p.b)+'% · 왼쪽 '+_pcFmt(p.l)+'% · 오른쪽 '+_pcFmt(p.r)+'% · 크기 '+p.z+'%'+(p.x||p.y?' · 위치 좌우 '+_pcFmt(p.x)+'% 상하 '+_pcFmt(p.y)+'%':'');
     chip.title=p.name+'\n'+desc+(mod?'\n불러온 뒤 값이 바뀌었습니다 · [＋ 저장]에서 덮어쓸 수 있습니다':'\n누르면 이 값으로 자릅니다');
     const nm=document.createElement('span');
     nm.className='pcChipName';
@@ -8120,7 +8175,8 @@ function confirmOverwriteCropPreset(){
 }
 
 /**
- * 미리보기 위에 잘린 곳(빗금)과 남은 곳(점선·손잡이)을 그리고, 줄여 넣기면 슬라이드를 남은 곳에 맞게 줄인다.
+ * 미리보기 위에 잘린 곳(빗금)과 남은 곳(점선·손잡이)을 그린다.
+ * 크기가 100%가 아니면 슬라이드를 남은 곳 가운데를 기준으로 확대·축소하고, 위치만큼 옮긴다.
  * 송출 화면(screen.html fitStage)과 같은 계산이므로 미리보기가 곧 송출 모양이다.
  */
 function _pcRenderOverlay(){
@@ -8143,16 +8199,18 @@ function _pcRenderOverlay(){
   // 남은 곳의 테두리·손잡이는 꺼 두었어도 저장된 값 자리에 보인다 ([화면 자르기] 탭에서만)
   const fr=document.getElementById('pcFrame');
   if(fr){ fr.style.top=s.t+'%'; fr.style.bottom=s.b+'%'; fr.style.left=s.l+'%'; fr.style.right=s.r+'%'; }
-  // 줄여 넣기: 슬라이드 전체를 남은 곳 안 가운데에 맞춘다
+  // 남은 곳 가운데를 기준으로 크기를 바꾸고 위치만큼 옮긴다
   const scr=document.getElementById('lbPvScreen');
   if(scr){
     const vw=1-(c.l+c.r)/100, vh=1-(c.t+c.b)/100;
-    if(c.fit&&(vw<1||vh<1)){
-      const k=Math.min(vw,vh), x=c.l/100+(vw-k)/2, y=c.t/100+(vh-k)/2;
-      scr.style.transform='translate('+(x*100)+'%,'+(y*100)+'%) scale('+k+')';
-    }else{
-      scr.style.transform='';
+    let k=1, x=0, y=0;
+    const z=c.z/100;
+    if(z!==1){
+      const cx=c.l/100+vw/2, cy=c.t/100+vh/2;
+      x=cx-(cx-x)*z; y=cy-(cy-y)*z; k*=z;
     }
+    x+=c.x/100; y+=c.y/100;
+    scr.style.transform=k===1&&x===0&&y===0?'':'translate('+(x*100)+'%,'+(y*100)+'%) scale('+k+')';
   }
 }
 
@@ -8191,25 +8249,52 @@ function _pcRenderOverlay(){
     h.addEventListener('pointerup',up);
     h.addEventListener('pointercancel',up);
   });
+  // 손잡이가 아닌 곳을 끌면 위치를 옮긴다 (끈 만큼 = 미리보기 크기에 대한 %)
+  if(pv) pv.addEventListener('pointerdown',e=>{
+    if(e.button!==0||_lbState.panel.tab!=='crop'||e.target.closest('.pcHandle')) return;
+    e.preventDefault();
+    const w=pv.clientWidth, hh=pv.clientHeight;
+    if(w<10||hh<10) return;
+    const sx=e.clientX, sy=e.clientY, x0=_pcState.x, y0=_pcState.y;
+    try{ pv.setPointerCapture(e.pointerId); }catch(err){}
+    const mv=ev=>{
+      if(!(ev.buttons&1)){ up(); return; }
+      _pcSetPos('x',x0+(ev.clientX-sx)/w*100);
+      _pcSetPos('y',y0+(ev.clientY-sy)/hh*100);
+    };
+    const up=()=>{
+      pv.removeEventListener('pointermove',mv);
+      pv.removeEventListener('pointerup',up);
+      pv.removeEventListener('pointercancel',up);
+      try{ pv.releasePointerCapture(e.pointerId); }catch(err){}
+      saveOutputCrop();
+    };
+    pv.addEventListener('pointermove',mv);
+    pv.addEventListener('pointerup',up);
+    pv.addEventListener('pointercancel',up);
+  });
 
-  PC_EDGES.forEach(e=>{
+  [...PC_EDGES,'z',...PC_POS].forEach(e=>{
+    const set=e==='z'?_pcSetZoom:PC_POS.includes(e)?v=>_pcSetPos(e,v):v=>_pcSetEdge(e,v), base=e==='z'?100:0;
     // 슬라이더: 움직이는 동안 바로 반영. 손을 떼면 포커스를 놓아 방향키·숫자키가 다시 슬라이드 조작으로 가게 한다
     const r=document.getElementById('pcR_'+e);
     if(r){
-      r.addEventListener('input',()=>_pcSetEdge(e,r.value));
+      r.addEventListener('input',()=>set(r.value));
       r.addEventListener('change',()=>{ saveOutputCrop(); r.blur(); });
       r.addEventListener('pointerup',()=>setTimeout(()=>r.blur(),0));
-      r.addEventListener('dblclick',()=>{ _pcSetEdge(e,0); r.blur(); });
+      r.addEventListener('dblclick',()=>{ set(base); r.blur(); });
     }
     // 숫자 칸: 치는 대로 반영, Enter로 마치고 Esc로 되돌린다
     const n=document.getElementById('pcN_'+e);
     if(n){
       n.addEventListener('focus',()=>{ n._before={v:_pcState[e],on:_pcState.on}; });
       n.addEventListener('input',()=>{
-        if(n.value.trim()!==''&&Number.isFinite(Number(n.value))) _pcSetEdge(e,n.value);
+        // 크기는 치는 중의 '1'(→ 50%)로 송출 화면이 튀지 않게 범위 안일 때만 바로 반영한다
+        const v=Number(n.value);
+        if(n.value.trim()!==''&&Number.isFinite(v)&&(e!=='z'||(v>=PC_Z_MIN&&v<=PC_Z_MAX))) set(n.value);
       });
       n.addEventListener('change',()=>{
-        _pcSetEdge(e,n.value.trim()===''?0:n.value);
+        set(n.value.trim()===''?base:n.value);
         n.value=_pcFmt(_pcState[e]);
         saveOutputCrop();
       });
@@ -9820,10 +9905,15 @@ function quickLoadLayoutToCurrentSlide(){
 function openSM(editId=null){try{
   if(!groups.length){alert('먼저 그룹을 추가해주세요.');return;}
   editSid=editId;
+  // 다중 선택된 슬라이드 중 하나를 편집하면 선택된 슬라이드 모두의 배경을 함께 바꾼다
+  editSids=!editId?[]:(_selectedIds.size>1&&_selectedIds.has(editId))?_orderedSlideIds([..._selectedIds]):[editId];
   pendingLayout=null;
   const smEl=document.getElementById('SM');
   smEl.classList.toggle('sm-mode-edit', !!editId);
-  document.getElementById('SMtitle').textContent=editId?'슬라이드 배경 편집':'슬라이드 추가';
+  smEl.classList.toggle('sm-multi-edit', editSids.length>1);
+  document.getElementById('SMtitle').textContent=editId
+    ?(editSids.length>1?'슬라이드 배경 편집 ('+editSids.length+'장)':'슬라이드 배경 편집')
+    :'슬라이드 추가';
   document.getElementById('SMsave').textContent=editId?'저장':'추가';
 
   const sel=document.getElementById('SMgrp');sel.innerHTML='';
@@ -9894,7 +9984,9 @@ const smPicker=createBgPicker('SM',{
   noneLabel:'없음 (기본 배경)',
   noneText:'배경 없음',
   dropText:'놓으면 바로 이 슬라이드 배경으로 적용됩니다',
-  infoText:()=>editSid?'이 슬라이드에만 적용됩니다.':'새로 추가하는 슬라이드에 적용됩니다.',
+  infoText:()=>editSid
+    ?(editSids.length>1?'선택한 슬라이드 '+editSids.length+'장 모두에 적용됩니다.':'이 슬라이드에만 적용됩니다.')
+    :'새로 추가하는 슬라이드에 적용됩니다.',
   autoPlay:true,
   onChange:_pmFromBg,
   // 그룹 배경과 같은 항목이면 그 영상을 그대로 써서 슬라이드를 넘겨도 끊기지 않고 이어서 재생되게 한다
@@ -9942,7 +10034,7 @@ function updateSMGroupBgRow(){
   if(!g||!g.bg){ row.style.display='none'; return; }
   row.style.display='flex';
   document.getElementById('SMgroupBgText').textContent='그룹 배경: '+describeGroupBg(g.bg)
-    +(editSid?' · 여기서 바꾸면 이 슬라이드만 바뀝니다':' · 따로 고르지 않으면 이 배경이 적용됩니다');
+    +(editSid?(editSids.length>1?' · 여기서 바꾸면 선택한 '+editSids.length+'장이 함께 바뀝니다':' · 여기서 바꾸면 이 슬라이드만 바뀝니다'):' · 따로 고르지 않으면 이 배경이 적용됩니다');
 }
 function useGroupBgInSM(){
   const g=getGrp(document.getElementById('SMgrp')?.value);
@@ -11939,6 +12031,20 @@ function saveSlide(){
       const otherBoxes=layoutTextBoxes.filter(b=>b.role!=='main');
       const mainBox=_buildMainBox(lyrics,textX,textY,sz,fc,ff,modalLayout.textShadowEnabled,modalLayout.textShadowIntensity,modalLayout.textOutlineEnabled,modalLayout.textOutlineWidth);
       s.textBoxes=mainBox?[...otherBoxes,mainBox]:otherBoxes;
+      // 함께 선택된 나머지 슬라이드에는 배경만 똑같이 입힌다 (텍스트·이름·그룹은 그대로)
+      editSids.forEach(id=>{
+        if(id===s.id) return;
+        const o=getSlide(id);
+        if(!o) return;
+        o.mediaURL=s.mediaURL; o.mediaType=s.mediaType;
+        o.mediaOffX=s.mediaOffX; o.mediaOffY=s.mediaOffY; o.mediaScale=s.mediaScale; o.mediaFit=s.mediaFit;
+        o.mediaAudioEnabled=s.mediaAudioEnabled;
+        o.mediaLoop=s.mediaLoop; o.mediaLoopMode=s.mediaLoopMode; o.mediaLoopFade=s.mediaLoopFade;
+        o.mediaAutoPlay=s.mediaAutoPlay;
+        o.bgColor=s.bgColor; o.chromaKey=s.chromaKey;
+        o.bgInfo=s.bgInfo?{...s.bgInfo}:null;
+      });
+      if(editSids.length>1) toast('선택한 슬라이드 '+editSids.length+'장의 배경을 바꿨습니다 ✓');
     }
   } else {
     const _otherBoxes=layoutTextBoxes.filter(b=>b.role!=='main');

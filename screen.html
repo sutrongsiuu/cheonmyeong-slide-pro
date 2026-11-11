@@ -231,17 +231,22 @@ function computeTextShadowCSS(enabled, intensity, scale){
 // 화면 자르기(_crop): 슬라이드 자리에서 위·아래·왼쪽·오른쪽을 슬라이드 크기의 %만큼 잘라 낸 곳만 보인다(#view).
 //   잘라 내기(fit=false): 슬라이드는 제자리 그대로, 잘린 가장자리만 검게 → 스크린 밖·가려진 곳에 빛이 가지 않게
 //   줄여 넣기(fit=true) : 슬라이드 전체를 남은 곳 안에 맞게 줄인다 → 글자가 잘리지 않는다
+//   크기(z, %)        : 그다음 남은 곳 가운데를 기준으로 무대를 확대·축소한다 (넘치면 잘리고, 작으면 둘레가 검다)
+//   위치(x, y, %)     : 마지막으로 무대를 슬라이드 자리 크기의 %만큼 옮긴다 (+는 오른쪽·아래)
 // 남은 곳의 가장자리도 정수 화면 픽셀에 맞춘다. PPT 캡처 창은 자르기를 받지 않으므로 늘 그대로다.
 const STAGE_W = 1920, STAGE_H = 1080, STAGE_K = 1.4
 const CROP_MAX_PAIR = 90   // 마주 보는 두 쪽(위+아래, 왼쪽+오른쪽)을 합쳐 자를 수 있는 최대 % (적어도 10%는 남긴다)
-let _crop = { t: 0, r: 0, b: 0, l: 0, fit: false }
+let _crop = { t: 0, r: 0, b: 0, l: 0, fit: false, z: 100, x: 0, y: 0 }
 let _stageBox = null  // 보이는 곳(#view) 안에서 무대가 놓인 자리 (화면 픽셀): { x, y, w, h, vw, vh, dpr }
 
-/** 받은 자르기 값을 검사한다. 이상한 값은 0, 마주 보는 두 쪽의 합이 90%를 넘으면 비율대로 줄인다 */
+/** 받은 자르기 값을 검사한다. 이상한 값은 0(크기는 100), 마주 보는 두 쪽의 합이 90%를 넘으면 비율대로 줄인다 */
 function _cleanCrop(c){
   const pct = v => { const n = Number(v); return Number.isFinite(n) ? Math.max(0, Math.min(CROP_MAX_PAIR, n)) : 0 }
   const o = (c && typeof c === 'object') ? c : {}
-  const r = { t: pct(o.t), r: pct(o.r), b: pct(o.b), l: pct(o.l), fit: o.fit === true }
+  const z = Number(o.z)
+  const pos = v => { const n = Number(v); return Number.isFinite(n) ? Math.max(-50, Math.min(50, n)) : 0 }
+  const r = { t: pct(o.t), r: pct(o.r), b: pct(o.b), l: pct(o.l), fit: o.fit === true,
+    z: Number.isFinite(z) && o.z != null ? Math.max(50, Math.min(200, z)) : 100, x: pos(o.x), y: pos(o.y) }
   ;[['t', 'b'], ['l', 'r']].forEach(([a, b]) => {
     const sum = r[a] + r[b]
     if (sum > CROP_MAX_PAIR) { r[a] *= CROP_MAX_PAIR / sum; r[b] *= CROP_MAX_PAIR / sum }
@@ -280,6 +285,15 @@ function fitStage(){
     if (vh - sh <= 2) sh = vh
     sx = Math.floor((vw - sw) / 2); sy = Math.floor((vh - sh) / 2)
   }
+  // 크기: 보이는 곳 가운데를 기준으로 확대·축소 (가장자리는 정수 화면 픽셀에)
+  if (c.z !== 100) {
+    const z = c.z / 100, cx = vw / 2, cy = vh / 2
+    const x0 = Math.round(cx - (cx - sx) * z), y0 = Math.round(cy - (cy - sy) * z)
+    const x1 = Math.round(cx - (cx - sx - sw) * z), y1 = Math.round(cy - (cy - sy - sh) * z)
+    sx = x0; sy = y0; sw = Math.max(1, x1 - x0); sh = Math.max(1, y1 - y0)
+  }
+  // 위치: 슬라이드 자리 크기의 %만큼 옮긴다
+  sx += Math.round(w * c.x / 100); sy += Math.round(h * c.y / 100)
   st.style.transform = `translate(${sx / dpr}px,${sy / dpr}px) scale(${sw / (STAGE_W * dpr)},${sh / (STAGE_H * dpr)})`
   _stageBox = { x: sx, y: sy, w: sw, h: sh, vw, vh, dpr }
   _placeMarkerLine()
@@ -312,6 +326,8 @@ let sL = 'A'
 
 // 진행 중인 페이드 애니메이션 목록 (새 슬라이드 전환 시 이전 애니메이션 취소용)
 let _fadeAnims = []
+// 진행 중인 크로스페이드 상태. 그 사이 배경이 같은 슬라이드가 오면 배경 페이드는 끊지 않고 글자만 바꾼다 (_continueFade)
+let _xf = null
 // 진행 중인 전환(준비 대기 + 페이드)이 끝나는 예상 시각. 그 전에는 대기 영상 준비 같은 무거운 일을 미룬다
 let _transitionUntil = 0
 
@@ -342,6 +358,10 @@ const _mediaCache = {}
 // 대기 영상은 재생 속도 0으로 '재생 중'인 채 둔다. 멈춘 영상은 15초쯤 지나면 디코더가 내려가지만, 재생 중인 영상은 그대로다.
 // 준비·정리는 한가할 때 하나씩만 한다 (화면 전환 중이나 반복 경계 근처에서는 미룬다).
 const STANDBY_MAX = 2
+// 배경 컨트롤로 배경만 바꿀 때 새 배경 영상이 화면에 고르게 나오기를 기다리는 최대 시간(ms) (VideoLoop.whenRolling).
+// 4K 송출에서는 새 영상이 화면에 처음 합성될 때 0.8초쯤 멈추는데, 그 구간을 페이드 전에 지나 보낸다.
+// 보통 0.5~1초 안에 끝나고, 숫자키를 빨리 두 번 눌러 대기 영상 준비가 덜 됐을 때만 조금 더 걸린다
+const BG_TAKE_WAIT = 3000
 const _standby = new Map()     // 영상 키(mId) → 준비해 둔 <video>
 let _standbyWant = []           // [{ key, url }] 준비해 둘 영상 (앞일수록 먼저 쓰일 영상)
 let _standbyTimer = null
@@ -558,8 +578,11 @@ function _getGbgLayer(){
   }
   return _gbgLayer
 }
-/** 슬라이드 데이터의 gbg에 맞춰 그룹 영상 레이어를 보이거나 숨긴다. 보이는 영상 요소를 돌려준다 (없으면 null) */
-function _updateGroupBg(d, fd){
+/**
+ * 슬라이드 데이터의 gbg에 맞춰 그룹 영상 레이어를 보이거나 숨긴다. 보이는 영상 요소를 돌려준다 (없으면 null)
+ * rollMs: 다른 영상으로 바뀔 때 새 영상이 제대로 돌기 시작할 때까지 기다릴 최대 시간 (배경 컨트롤 전환)
+ */
+function _updateGroupBg(d, fd, rollMs){
   const layer = _getGbgLayer()
   if (!layer) return null
   const g = d && d.gbg
@@ -568,7 +591,7 @@ function _updateGroupBg(d, fd){
   _setBgFilter(document.getElementById('GBG'), _bgFilter(d.bgb), fd)
   if (g.key && g.url) _mediaCache[g.key] = g.url
   const url = (g.key && _mediaCache[g.key]) || g.url
-  return layer.show({ ...g, url }, fd)
+  return layer.show({ ...g, url }, fd, rollMs)
 }
 
 /** 레이어(.ml) 안에서 지금 보이며 재생 중인 영상 요소. 반복 이어달리기 중이면 쌍둥이 쪽일 수 있다 */
@@ -1038,6 +1061,61 @@ function fillL (L, d, opts) {
   }
 }
 
+/** 슬라이드 배경(사진·영상·배경색·그룹 영상·밝기)의 서명. 같으면 배경이 같다 */
+function _bgSigOf(d){
+  const bg = d.chromaKey ? (d.bgColor || d.chromaKeyColor || '#00b140') : (d.bgColor || '')
+  return [_mediaKeyOf(d), d.mType || '', bg, !!d.chromaKey, (d.gbg && d.gbg.key) || '', d.bgb ?? ''].join('#')
+}
+
+/** 레이어 안의 배경 부분(배경색·사진/영상)인지. 나머지(도형·글자)는 슬라이드마다 바뀌는 부분 */
+function _isBgPart(el){
+  return el.classList.contains('bgc') || el.classList.contains('ml')
+}
+
+/**
+ * 크로스페이드 중에 배경이 같은 다음 슬라이드가 왔을 때: 배경 페이드는 그대로 이어 가고 글자·도형만 바꾼다.
+ * (배경 컨트롤로 배경을 바꾸는 중에 슬라이드를 넘겨도 배경이 툭 바뀌지 않는다)
+ *   - 나타나는 레이어의 지금 글자·도형을 복사해 같은 자리에 겹쳐 두고 fd초 동안 투명하게 한 뒤, 레이어에는 새 슬라이드를 그린다
+ *   - 사라지는 레이어의 글자·도형은 지금 보이는 투명도에서 fd초 동안 마저 사라진다 (배경 페이드가 길어도 남아 있지 않게)
+ */
+function _continueFade(x, d, fd){
+  const ms = fd * 1000
+  if (ms <= 0) x.nEl.querySelectorAll('.xf-ghost').forEach(g => g.remove())
+  ;[...x.nEl.children].forEach(el => {
+    // 즉시 전환이면 복사본 없이 글자만 바로 바뀐다
+    if (ms <= 0 || _isBgPart(el) || el.classList.contains('xf-ghost')) return
+    const g = el.cloneNode(true)
+    g.classList.add('xf-ghost')
+    g.removeAttribute('id')
+    g.querySelectorAll('[id]').forEach(n => n.removeAttribute('id'))
+    el.after(g)
+    const a = g.animate([{ opacity: 1 }, { opacity: 0 }], { duration: ms, easing: 'ease-in-out', fill: 'forwards' })
+    a.onfinish = () => g.remove()
+  })
+
+  if (x.anims) {
+    x.anims.forEach((old, el) => {
+      if (_isBgPart(el)) return
+      const op = parseFloat(getComputedStyle(el).opacity) || 0
+      old.onfinish = null
+      try { old.cancel() } catch (e) {}
+      const a = el.animate([{ opacity: op }, { opacity: 0 }], { duration: ms, easing: 'ease-in-out', fill: 'forwards' })
+      a.onfinish = x.check
+      x.anims.set(el, a)
+    })
+  } else {
+    // 아직 새 화면 준비를 기다리는 중: 페이드가 시작될 때 글자는 이 시간으로 사라진다
+    x.textMs = ms
+  }
+  x.extend(ms)
+
+  // 배경은 이미 그려져 있으므로(같은 서명) 영상은 되감지 않고 이어서, 글자만 새로 그린다
+  fillL(x.nL, d, { carried: true })
+  _updateGroupBg(d, fd)
+  _setUpcoming(d.up)
+  _transitionUntil = Math.max(_transitionUntil, performance.now() + ms)
+}
+
 /**
  * 슬라이드를 화면에 표시한다.
  * 페이드 시간(fd)이 있으면 A↔B 레이어를 교차해 크로스페이드,
@@ -1063,16 +1141,23 @@ function applySlide (d) {
   // 슬라이드 전환 시 이전 클릭재생 핸들러 제거
   _clearClickToPlay()
 
-  // 이전 전환이 아직 진행 중이면 바로 끝낸다
-  _fadeAnims.forEach(a => { if (a.cancel) a.cancel() })
-  _fadeAnims = []
+  // 페이드 중에 배경이 같은 슬라이드가 오면 (예: 배경 컨트롤로 배경을 바꾸는 중에 슬라이드를 넘김)
+  // 슬라이드의 페이드 시간(즉시 전환 포함)과 상관없이 배경 페이드는 끊지 않고 이어 간다.
+  // 그 밖에는 이전 전환이 아직 진행 중이면 바로 끝낸다
+  const keepFade = !!_xf && _xf.sig === _bgSigOf(d)
+  if (!keepFade) {
+    _fadeAnims.forEach(a => { if (a.cancel) a.cancel() })
+    _fadeAnims = []
+  }
 
   // 현재 보이는 레이어와 다음에 쓸 레이어
   const curEl = document.getElementById('L' + sL)
   const nL    = sL === 'A' ? 'B' : 'A'
   const nEl   = document.getElementById('L' + nL)
 
-  if (fd > 0) {
+  if (keepFade) {
+    _continueFade(_xf, d, fd)
+  } else if (fd > 0) {
     // ── 크로스페이드 모드 ──
     // 다음 슬라이드를 뒤(nEl, opacity=1)에 배치하고 현재 슬라이드(curEl)만 opacity 1→0 으로 페이드아웃
     // — 검정 배경이 비치지 않도록 nEl이 항상 뒤에서 보인다
@@ -1084,9 +1169,15 @@ function applySlide (d) {
     const outVids = [...curEl.querySelectorAll('video')]
     outVids.forEach(v => { v.muted = true })
 
+    // 새 화면 준비를 기다리는 최대 시간(ms).
+    // 배경 컨트롤로 배경만 바꿀 때는 글자가 그대로라 조금 늦어도 괜찮으므로, 새 영상이 화면에 고르게
+    // 나올 때까지 더 기다린다 (첫 화면에서 멈춰 보이거나 페이드 중에 뚝뚝 끊기지 않게)
+    const READY_WAIT = d.bgTake ? BG_TAKE_WAIT : 700
     const prevGbg = (_gbgLayer && _gbgLayer.active()) ? _gbgLayer.video() : null
+    // 숨어 있던 레이어에 남은 지난 글자 복사본(_continueFade)은 지운다
+    nEl.querySelectorAll('.xf-ghost').forEach(g => g.remove())
     fillL(nL, d, { carried })
-    const gbgVid = _updateGroupBg(d, fd)
+    const gbgVid = _updateGroupBg(d, fd, d.bgTake ? BG_TAKE_WAIT : 0)
     _setUpcoming(d.up)
 
     nEl.style.transition = 'none'
@@ -1096,13 +1187,16 @@ function applySlide (d) {
     curEl.style.opacity    = '1'
     curEl.style.zIndex     = '2'
 
-    const READY_WAIT = 700  // 새 화면 준비를 기다리는 최대 시간(ms)
-    let anim = null, finished = false
+    let finished = false
+    // anims: 페이드가 시작되면 사라지는 레이어의 부분별 애니메이션 (_continueFade가 글자 쪽을 바꿔 끼운다)
+    const x = { sig: _bgSigOf(d), nEl, nL, anims: null, textMs: fd * 1000 }
+    _xf = x
     const finish = () => {
       if (finished) return
       finished = true
+      if (_xf === x) _xf = null
       clearTimeout(safety)
-      if (anim) { try { anim.cancel() } catch (e) {} ; anim = null }
+      if (x.anims) { x.anims.forEach(a => { try { a.cancel() } catch (e) {} }) ; x.anims = null }
       // 레이어 역할 교체
       curEl.style.opacity = '0'
       curEl.style.zIndex  = '1'
@@ -1115,24 +1209,41 @@ function applySlide (d) {
       _scheduleStandby()
     }
     // 페이드 끝 알림이 오지 않는 경우를 대비한 안전장치
-    const safety = setTimeout(finish, READY_WAIT + fd * 1000 + 500)
+    let safety = setTimeout(finish, READY_WAIT + fd * 1000 + 500)
+    // 이어 가는 중에 글자가 더 오래 사라지면 안전장치도 그만큼 늦춘다
+    x.extend = ms => {
+      clearTimeout(safety)
+      safety = setTimeout(finish, READY_WAIT + Math.max(fd * 1000, ms) + 500)
+    }
+    // 모든 부분이 다 사라지면 끝 (배경과 글자의 페이드 시간이 다를 수 있다)
+    x.check = () => {
+      if (x.anims && [...x.anims.values()].every(a => a.playState === 'finished')) finish()
+    }
     _transitionUntil = performance.now() + READY_WAIT + fd * 1000
     _fadeAnims = [{ cancel: finish }]
 
     // 새로 나타날 사진·영상의 첫 화면을 기다린 뒤 페이드 (이어 재생하는 영상은 이미 재생 중이라 바로 통과)
     const incoming = [...nEl.querySelectorAll('.ml img, .ml video:not([data-loop-twin])')]
     if (gbgVid && gbgVid !== prevGbg) incoming.push(gbgVid)
-    const ready = (window.VideoLoop && VideoLoop.whenReady) ? VideoLoop.whenReady(incoming, READY_WAIT) : Promise.resolve()
+    const ready = !window.VideoLoop ? Promise.resolve()
+      : (d.bgTake && VideoLoop.whenRolling)
+        ? Promise.all(incoming.map(el => el.tagName === 'VIDEO' ? VideoLoop.whenRolling(el, READY_WAIT) : VideoLoop.whenReady([el], READY_WAIT)))
+        : VideoLoop.whenReady ? VideoLoop.whenReady(incoming, READY_WAIT) : Promise.resolve()
     ready.then(() => {
       if (finished) return
       // 사라지는 레이어의 배경색·사진/영상·도형·글자를 하나씩 같은 시간에 투명하게 (위 3번 설명)
-      const parts = [...curEl.children].map(el => el.animate([{ opacity: 1 }, { opacity: 0 }],
-        { duration: fd * 1000, easing: 'ease-in-out', fill: 'forwards' }))
-      anim = { cancel: () => parts.forEach(a => { try { a.cancel() } catch (e) {} }) }
-      parts[0].onfinish = finish
+      // (지난 글자 복사본은 제 페이드대로 사라지게 둔다)
+      x.anims = new Map()
+      ;[...curEl.children].filter(el => !el.classList.contains('xf-ghost')).forEach(el => {
+        const a = el.animate([{ opacity: 1 }, { opacity: 0 }],
+          { duration: _isBgPart(el) ? fd * 1000 : x.textMs, easing: 'ease-in-out', fill: 'forwards' })
+        a.onfinish = x.check
+        x.anims.set(el, a)
+      })
     })
   } else {
     // ── 즉시 전환 모드 ──
+    document.querySelectorAll('.xf-ghost').forEach(g => g.remove())
     // 바로 앞 슬라이드와 같은 영상이면 멈추거나 되감지 않고 이어서 재생한다
     const curMl = document.getElementById('M' + sL)
     const carried = d.mType === 'video' && !!curMl && curMl.dataset.cacheKey === _mediaKeyOf(d)

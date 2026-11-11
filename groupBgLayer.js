@@ -7,6 +7,7 @@
  *
  *  show(spec, fd) : 이 영상을 보여준다. 이미 같은 영상이면 그대로 이어서 재생한다.
  *                   다른 영상이면 새 영상의 첫 화면이 준비된 뒤 fd초 동안 서서히 나타난다.
+ *                   show(spec, fd, rollMs): 첫 화면 대신 영상이 실제로 돌기 시작할 때까지 최대 rollMs 기다린다.
  *  hide(fd)       : 따로 배경을 넣은 슬라이드로 넘어갈 때. fd초 동안 사라진 뒤 일시정지한다.
  *                   (다시 show 하면 멈춘 위치부터 이어서 재생)
  *                   opts.park(video, key)가 true면 멈추는 대신 재생 속도 0으로 세워 둔다 (디코더를 내리지 않아 바로 이어진다)
@@ -29,6 +30,8 @@
   const act = v => (window.VideoLoop && v) ? VideoLoop.active(v) : v
   /** 이 영상을 이루는 요소들 (이어달리기 쌍둥이 포함) */
   const all = v => (window.VideoLoop && v) ? VideoLoop.elements(v) : (v ? [v] : [])
+  /** 페이드 전에 새 영상을 미리 합성해 둘 때의 투명도 (화면에서는 거의 보이지 않는다) */
+  const ROLL_OPACITY = 0.02
 
   function create(container, opts){
     opts = opts || {}
@@ -80,7 +83,7 @@
       if (hideTimer) { clearTimeout(hideTimer); hideTimer = null }
     }
 
-    function show(spec, fd){
+    function show(spec, fd, rollMs){
       if (!spec || !spec.url) { hide(fd); return null }
       fd = Math.max(0, parseFloat(fd) || 0)
       clearHide()
@@ -141,9 +144,15 @@
           // 새 영상의 첫 화면이 준비된 뒤에 시작해야 중간에 툭 튀어나오지 않는다 (최대 0.7초 대기).
           // 그동안 이전 영상은 아래에서 계속 재생되고, 새 영상이 다 나타나면 정리한다.
           retiring.push(old.video)
-          v.style.opacity = '0'
-          // 썸네일만 보여 두는 동안이면 첫 화면을 기다리지 않는다
-          const ready = (hold <= 0 && window.VideoLoop && VideoLoop.whenFrame) ? VideoLoop.whenFrame(v, 700) : Promise.resolve()
+          // 썸네일만 보여 두는 동안이면 첫 화면을 기다리지 않는다.
+          // rollMs가 있으면(배경 컨트롤로 배경만 바꿀 때) 새 영상이 화면에 고르게 나올 때까지 최대 rollMs 기다린다.
+          //   무거운 영상은 화면에 처음 합성될 때(4K 송출 등) 한동안 멈춘다. 투명도 0이면 합성되지 않아 그 멈춤이
+          //   페이드 도중에 보이므로, 눈에 띄지 않는 투명도(ROLL_OPACITY)로 먼저 합성해 그 구간을 지나 보낸다
+          const roll = hold <= 0 && rollMs > 0 && !!(window.VideoLoop && VideoLoop.whenRolling)
+          v.style.opacity = roll ? String(ROLL_OPACITY) : '0'
+          const ready = (hold > 0 || !window.VideoLoop) ? Promise.resolve()
+            : roll ? VideoLoop.whenRolling(v, rollMs)
+            : VideoLoop.whenFrame ? VideoLoop.whenFrame(v, 700) : Promise.resolve()
           ready.then(() => {
             if (!cur || cur.video !== v) return   // 그 사이 또 다른 영상으로 바뀜 → 그쪽이 이어받아 정리한다
             v.style.transition = 'opacity ' + fd + 's ease-in-out'

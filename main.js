@@ -1756,14 +1756,18 @@ ipcMain.on("bg-brightness", (event, msg) => {
 /**
  * IPC 핸들러: 프로젝터 설정의 화면 자르기 값을 그 송출 화면으로 전달한다. 자르기는 송출 화면(모니터)마다 따로다.
  * id: 송출 화면의 모니터 id
- * { t, r, b, l: 위·오른쪽·아래·왼쪽에서 자를 만큼(슬라이드 크기의 %, 0~90), fit: 남은 곳에 슬라이드 전체를 줄여 넣기 }
+ * { t, r, b, l: 위·오른쪽·아래·왼쪽에서 자를 만큼(슬라이드 크기의 %, 0~90), fit: 남은 곳에 슬라이드 전체를 줄여 넣기,
+ *   z: 크기(확대·축소 %, 50~200, 없으면 100), x·y: 위치(슬라이드 크기의 %, −50~50, +는 오른쪽·아래) }
  * 마주 보는 두 쪽의 합(90% 이하)은 송출 화면이 다시 검사한다.
  */
 ipcMain.on("output-crop", (event, id, msg) => {
   if (id == null) return;
   const m = (msg && typeof msg === "object") ? msg : {};
   const pct = (v) => { const n = Number(v); return Number.isFinite(n) ? Math.max(0, Math.min(90, n)) : 0; };
-  sendToOutputs("output-crop", { t: pct(m.t), r: pct(m.r), b: pct(m.b), l: pct(m.l), fit: m.fit === true }, id);
+  const z = Number(m.z);
+  const pos = (v) => { const n = Number(v); return Number.isFinite(n) ? Math.max(-50, Math.min(50, n)) : 0; };
+  sendToOutputs("output-crop", { t: pct(m.t), r: pct(m.r), b: pct(m.b), l: pct(m.l), fit: m.fit === true,
+    z: Number.isFinite(z) && m.z != null ? Math.max(50, Math.min(200, z)) : 100, x: pos(m.x), y: pos(m.y) }, id);
 });
 
 /**

@@ -27,6 +27,7 @@
  *
  * 화면 전환 도우미: VideoLoop.whenFrame(video, ms) / VideoLoop.whenReady([img·video...], ms)
  *       새로 나타날 사진·영상의 첫 화면이 준비될 때까지 기다린다 (페이드를 부드럽게 시작하기 위해).
+ *       VideoLoop.whenRolling(video, ms, frames) : 첫 화면을 지나 영상이 실제로 돌기 시작할 때까지 기다린다.
  */
 (function(){
   const states = new WeakMap()   // main·쌍둥이 → 같은 상태 객체
@@ -408,6 +409,50 @@
     })
   }
 
+  /**
+   * 영상이 화면에 고르게 나오기 시작할 때까지 기다린다 (최대 ms).
+   * 프레임이 frames장 연달아 끊김 없이(간격 0.12초 이하) 화면에 나오면 끝난다. 중간에 멈추면 처음부터 다시 센다.
+   * 무거운 영상은 화면에 처음 합성될 때(4K 송출 등) 한동안 멈추므로, 그 구간이 지난 뒤 페이드를 시작하려고 쓴다.
+   */
+  function whenRolling(vid, ms, frames){
+    vid = active(vid)
+    ms = ms || 3000
+    frames = frames || 15
+    return new Promise(resolve => {
+      if (!vid) { resolve(); return }
+      // 멈춰 둘 영상(클릭 시 재생)은 돌지 않으므로 첫 화면만 기다린다
+      if (vid.paused && !vid.autoplay) { whenFrame(vid, Math.min(ms, 700)).then(resolve); return }
+      let done = false, n = 0, last = 0
+      const t0 = performance.now()
+      const finish = () => {
+        if (done) return
+        done = true
+        clearTimeout(timer)
+        resolve()
+      }
+      const timer = setTimeout(finish, ms)
+      if (!vid.requestVideoFrameCallback) {
+        // 프레임 알림이 없으면 재생 위치로 대신한다
+        const poll = () => {
+          if (done) return
+          if ((!vid.paused && vid.readyState >= 3 && vid.currentTime >= 0.5) || !vid.isConnected || vid.error) { finish(); return }
+          if (performance.now() - t0 < ms) requestAnimationFrame(poll)
+        }
+        requestAnimationFrame(poll)
+        return
+      }
+      const onFrame = now => {
+        if (done) return
+        if (!vid.isConnected || vid.error) { finish(); return }
+        n = (last && now - last > 120) ? 1 : n + 1
+        last = now
+        if (n >= frames) { finish(); return }
+        vid.requestVideoFrameCallback(onFrame)
+      }
+      vid.requestVideoFrameCallback(onFrame)
+    })
+  }
+
   /** 여러 사진(<img>)·영상의 첫 화면이 모두 준비될 때까지 기다린다 (최대 ms) */
   function whenReady(list, ms){
     ms = ms || 700
@@ -418,5 +463,5 @@
     return Promise.race([Promise.all(tasks), new Promise(r => setTimeout(r, ms))])
   }
 
-  window.VideoLoop = { attach, detach, unload, active, elements, looping, reversing, busy, fadeInfo, mirror, mirroring, whenFrame, whenReady }
+  window.VideoLoop = { attach, detach, unload, active, elements, looping, reversing, busy, fadeInfo, mirror, mirroring, whenFrame, whenRolling, whenReady }
 })()
